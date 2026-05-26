@@ -1,0 +1,229 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  /* KPH OS — paleta dark editorial (mesma do painel Madonna). Ouro discreto, neutros frios. */
+  --background: #0A0A0B;
+  --foreground: #E5E5E7;
+  --card: #131316;
+  --card-foreground: #E5E5E7;
+  --popover: #1A1A1E;
+  --popover-foreground: #E5E5E7;
+  --primary: #D4A574;       /* gold como ação principal */
+  --primary-foreground: #1A1208;
+  --secondary: #1A1A1E;
+  --secondary-foreground: #E5E5E7;
+  --muted: #1A1A1E;
+  --muted-foreground: #71717A;
+  --accent: rgba(212, 165, 116, 0.16);
+  --accent-foreground: #D4A574;
+  --destructive: #EF4444;
+  --border: #27272A;
+  --input: #27272A;
+  --ring: #D4A574;
+  --chart-1: #D4A574;
+  --chart-2: #3B82F6;
+  --chart-3: #22C55E;
+  --chart-4: #A855F7;
+  --chart-5: #F59E0B;
+  --sidebar: #131316;
+  --sidebar-foreground: #E5E5E7;
+  --sidebar-primary: #D4A574;
+  --sidebar-primary-foreground: #1A1208;
+  --sidebar-accent: #1A1A1E;
+  --sidebar-accent-foreground: #E5E5E7;
+  --sidebar-border: #27272A;
+  --sidebar-ring: #D4A574;
+
+  /* Vars próprios (não-shadcn) — usados em components custom (Sidebar, etc.). */
+  --bg: #0A0A0B;
+  --surface: #131316;
+  --surface-2: #1A1A1E;
+  --surface-3: #232328;
+  --text: #E5E5E7;
+  --text-2: #A1A1AA;
+  --text-3: #71717A;
+  --border-strong: #3F3F46;
+  --brand: #D4A574;
+  --brand-soft: rgba(212, 165, 116, 0.16);
+  --brand-strong: #B8895C;
+  --t: 160ms ease;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-lg: 0 12px 24px -8px rgba(0,0,0,0.5);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* ── KPH Shell Responsivo ── */
+@media (max-width: 767px) {
+  .shell-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  .shell-sidebar.open {
+    transform: translateX(0);
+  }
+  .shell-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 90;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .shell-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .shell-hamburger {
+    display: flex !important;
+  }
+  .shell-topbar {
+    padding: 0 16px !important;
+    gap: 12px !important;
+  }
+  .shell-topbar-title {
+    font-size: 13px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .shell-topbar-date {
+    display: none !important;
+  }
+  .shell-topbar-search span {
+    display: none !important;
+  }
+  .shell-main {
+    padding: 24px 16px !important;
+  }
+  .ponto-toggle {
+    width: 100%;
+  }
+  .ponto-toggle a {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+  .ponto-bulk-actions {
+    width: 100%;
+  }
+  .ponto-bulk-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .ponto-date-filter {
+    width: 100%;
+  }
+}
+
+@media (min-width: 768px) {
+  .shell-sidebar {
+    position: relative !important;
+    transform: none !important;
+  }
+  .shell-backdrop {
+    display: none !important;
+  }
+  .shell-hamburger {
+    display: none !important;
+  }
+}
