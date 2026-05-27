@@ -44,7 +44,8 @@
       "@kph/auth": ["./lib/kph/auth/index.ts"],
       "@kph/auth/context": ["./lib/kph/auth/context.tsx"],
       "@kph/auth/server": ["./lib/kph/auth/server.ts"],
-      "@kph/auth/unit": ["./lib/kph/auth/unit.ts"]
+      "@kph/auth/unit": ["./lib/kph/auth/unit.ts"],
+      "@kph/ui/sidebar": ["./lib/kph/ui/Sidebar.tsx"]
     }
   },
   "include": [
