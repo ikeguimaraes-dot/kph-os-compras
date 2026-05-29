@@ -86,6 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/financeiro",              label: "Cockpit",           icon: Gauge },
       { href: "/financeiro/fluxo",        label: "Fluxo de Caixa",   icon: ArrowLeftRight },
       { href: "/financeiro/dre",          label: "DRE",               icon: Sheet },
+      { href: "/financeiro/produtos",     label: "Relatório de Produtos", icon: Package },
       { href: "/financeiro/pagar",        label: "Contas a Pagar",   icon: CreditCard },
       { href: "/financeiro/receber",      label: "Contas a Receber", icon: Banknote },
       { href: "/financeiro/aprovacoes",   label: "Aprovações",        icon: CheckSquare },
