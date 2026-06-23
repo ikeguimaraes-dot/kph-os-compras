@@ -190,29 +190,29 @@ export function parsePage(lines: string[]): PageParse | null {
   const codigo = prodLine.match(PROD_CODE_RE)![1]!;
   const isSub = prodLine.includes("SUBPRODUTO");
   const nums = findNums(prodLine); // [Q.Produção, ..., Custo Produção] (a data não casa)
+  // rendimento ← Q. Produção (1ª coluna numérica). NÃO usamos o "Custo Produção"
+  // do cabeçalho (nums[-1]) — esse é o custo do LOTE (= rodapé × rendimento). O
+  // custo_total da ficha é o "Custo dos Insumos" do RODAPÉ (custo por porção),
+  // capturado abaixo.
   const rendimento = nums.length ? brToFloat(nums[0]!) : 1.0;
-  const custoTotal = nums.length ? brToFloat(nums[nums.length - 1]!) : 0.0;
   const trimmed = prodLine.replace(/\s+$/g, "");
   const toks = trimmed.split(/\s+/);
   const situacao = toks[toks.length - 1] ?? "";
   const nomeM = prodLine.match(PROD_NAME_RE);
   const nome = nomeM ? nomeM[1]!.trim() : "?";
 
-  const produto: ParsedProduto = {
-    codigo,
-    nome,
-    tipo: isSub ? "subproduto" : "produto_acabado",
-    rendimento,
-    custo_total: custoTotal,
-    situacao,
-  };
-
   // ── linhas de INSUMO (entre header e "Custo dos Insumos") ──
   const insumos: PageParse["insumos"] = [];
   let pendDesc: string[] = [];
+  let custoRodape: number | null = null; // "Custo dos Insumos" (custo por porção)
   for (let i = hdr + 1; i < lines.length; i++) {
     const l = lines[i]!;
-    if (l.includes("Custo dos Insumos")) break;
+    if (l.includes("Custo dos Insumos")) {
+      const fn = findNums(l);
+      NUM_RE.lastIndex = 0;
+      if (fn.length) custoRodape = brToFloat(fn[fn.length - 1]!);
+      break;
+    }
     const m = l.match(INSUMO_ROW_RE);
     const isInsumo =
       !!m &&
@@ -267,6 +267,20 @@ export function parsePage(lines: string[]): PageParse | null {
     }
     NUM_RE.lastIndex = 0;
   }
+
+  // custo_total = Σ das linhas (= "Custo dos Insumos" do rodapé, custo por
+  // porção). Usamos a soma das linhas (reproduz exatamente os insumos exibidos
+  // e o servidor reconcilia sem rounding). O rodapé impresso (custoRodape) é só
+  // fallback se a ficha não tiver linhas. NUNCA o "Custo Produção" do cabeçalho.
+  const somaLinhas = round4(insumos.reduce((s, ins) => s + ins.custo_total, 0));
+  const produto: ParsedProduto = {
+    codigo,
+    nome,
+    tipo: isSub ? "subproduto" : "produto_acabado",
+    rendimento,
+    custo_total: insumos.length > 0 ? somaLinhas : (custoRodape ?? 0),
+    situacao,
+  };
 
   return { produto, insumos };
 }

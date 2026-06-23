@@ -25,9 +25,9 @@ for (const l of golden.linhas) {
 let reconcileOk = 0;
 for (const p of golden.produtos) {
   const ls = linhasByProduto.get(p.codigo) ?? [];
+  // custo_total = Σ(q·cu) (rodapé), sem × rendimento.
   const sum = ls.reduce((s, l) => s + l.quantidade * l.custo_unitario, 0);
-  const calc = sum * (p.rendimento || 1);
-  if (sum === 0 || Math.abs(calc - p.custo_total) <= 0.02) reconcileOk++;
+  if (Math.abs(sum - p.custo_total) <= 0.02) reconcileOk++;
 }
 
 const produtoCodes = new Set(golden.produtos.map((p) => p.codigo));

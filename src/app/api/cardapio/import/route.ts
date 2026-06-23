@@ -84,28 +84,34 @@ export async function POST(req: Request) {
     return json({ error: "não foi possível resolver brand_id/group_id da unit" }, 500);
   }
 
-  // ── 2) Reconciliação (defesa): custo_total ≈ Σ(q·cu)·rendimento ──
+  // ── 2) Reconciliação (defesa): custo_total = Σ(q·cu) das linhas ──
+  //   custo_total da ficha é o "Custo dos Insumos" (rodapé / custo por porção),
+  //   que é exatamente Σ(quantidade·custo_unitario). NÃO multiplicamos por
+  //   rendimento (isso daria o custo do LOTE, que superestima o CMV). Aqui
+  //   recalculamos a soma e checamos contra o custo_total recebido — sanity
+  //   contra corrupção no transporte — e usamos a soma recalculada na gravação.
   const linhasByProduto = new Map<string, ParsedLinha[]>();
   for (const l of parsed.linhas) {
     const arr = linhasByProduto.get(l.produto) ?? [];
     arr.push(l);
     linhasByProduto.set(l.produto, arr);
   }
+  const custoByProduto = new Map<string, number>(); // codigo → Σ(q·cu) recalculado
   const divergentes: Divergencia[] = [];
   let reconcileOk = 0;
   for (const p of parsed.produtos) {
     const ls = linhasByProduto.get(p.codigo) ?? [];
-    const sum = ls.reduce((s, l) => s + l.quantidade * l.custo_unitario, 0);
-    const calc = sum * (p.rendimento || 1);
-    if (sum === 0 || Math.abs(calc - p.custo_total) <= RECONCILE_TOL) {
+    const sum = round4(ls.reduce((s, l) => s + l.quantidade * l.custo_unitario, 0));
+    custoByProduto.set(p.codigo, sum);
+    if (Math.abs(sum - p.custo_total) <= RECONCILE_TOL) {
       reconcileOk++;
     } else {
       divergentes.push({
         codigo: p.codigo,
         nome: p.nome,
         declarado: round2(p.custo_total),
-        calculado: round2(calc),
-        diff: round2(calc - p.custo_total),
+        calculado: round2(sum),
+        diff: round2(sum - p.custo_total),
       });
     }
   }
@@ -195,7 +201,7 @@ export async function POST(req: Request) {
         unit_id: unitId,
         codigo: p.codigo,
         nome: p.nome,
-        custo_total: p.custo_total,
+        custo_total: custoByProduto.get(p.codigo) ?? p.custo_total,
         rendimento: p.rendimento,
         is_subproduto: p.tipo === "subproduto",
         ativo: p.situacao.toLowerCase() !== "inativo",
@@ -221,7 +227,7 @@ export async function POST(req: Request) {
         .from("menu_items")
         .update({
           nome: p.nome,
-          custo_total: p.custo_total,
+          custo_total: custoByProduto.get(p.codigo) ?? p.custo_total,
           rendimento: p.rendimento,
           is_subproduto: p.tipo === "subproduto",
           ativo: p.situacao.toLowerCase() !== "inativo",
@@ -324,6 +330,10 @@ export async function POST(req: Request) {
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
+}
+
+function round4(n: number) {
+  return Math.round((n + Number.EPSILON) * 1e4) / 1e4;
 }
 
 function* chunks<T>(arr: T[], size: number): Generator<T[]> {

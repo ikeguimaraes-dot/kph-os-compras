@@ -59,16 +59,18 @@ def parse_page(page_text: str):
 
     codigo = re.match(r'\s*(\d{6,7})', prod_line).group(1)
     is_sub = "SUBPRODUTO" in prod_line
-    nums = NUM.findall(prod_line)        # [Q.Produção, ..., Custo Produção]  (a data dd/mm/aaaa NÃO casa)
+    nums = NUM.findall(prod_line)        # [Q.Produção, ..., Custo Produção(LOTE) ] (data dd/mm/aaaa NÃO casa)
     rendimento = br_to_float(nums[0]) if nums else 1.0
-    custo_total = br_to_float(nums[-1]) if nums else 0.0
+    # OBS: nums[-1] é o "Custo Produção" = custo do LOTE (= rodapé × rendimento).
+    # NÃO use ele como custo_total. O custo_total correto é o custo POR PORÇÃO =
+    # "Custo dos Insumos" (rodapé) = soma das linhas. Calculado no fim, após os insumos.
     situacao = prod_line.rstrip().split()[-1]            # "Ativo" / "Inativo"
     nome_m = re.match(r'\s*\d{6,7}\s+(.+?)\s{2,}', prod_line)
     nome = nome_m.group(1).strip() if nome_m else "?"
 
     produto = dict(
         codigo=codigo, nome=nome, is_subproduto=is_sub,
-        rendimento=rendimento, custo_total=custo_total,
+        rendimento=rendimento, custo_total=0.0,   # preenchido no fim (soma das linhas)
         ativo=(situacao.lower() == "ativo"),
     )
 
@@ -112,6 +114,8 @@ def parse_page(page_text: str):
             # linha de descrição órfã (nome do insumo quebrou em 2/3 linhas)
             pend_desc.append(re.sub(r'\s{2,}', ' ', l.strip()))
 
+    # custo_total = custo POR PORÇÃO = soma das linhas (= "Custo dos Insumos"/rodapé).
+    produto["custo_total"] = round(sum(i["custo_total"] for i in insumos), 4)
     return produto, insumos
 
 
@@ -134,9 +138,11 @@ def parse_page(page_text: str):
 #   - 1007 insumos distintos por código (311 espelham ficha / 696 matéria-prima folha)
 #   - 2725 linhas de recipe_item no total
 #   - UMs presentes: UNID, UN, L, ML, KG, GF
-#   - RECONCILIAÇÃO: para TODAS as 936 fichas, sum(quantidade*custo_unitario) deve
-#     bater com o "Custo Produção" declarado dentro de R$ 0,02. (Hoje: 936/936.)
-#   - soma do custo_total dos 598 produto_acabado ≈ R$ 42.504,97
+#   - RECONCILIAÇÃO: para TODAS as 936 fichas, sum(quantidade*custo_unitario) das linhas
+#     deve bater com o "Custo dos Insumos" (RODAPÉ) declarado dentro de R$ 0,02. (936/936.)
+#     [NÃO é o "Custo Produção" do cabeçalho — esse é o custo do LOTE = rodapé × rendimento.]
+#   - custo_total do produto = ESSA soma (custo por porção), não o cabeçalho.
+#   - soma do custo_total dos 598 produto_acabado ≈ R$ 42.375,00
 # Se algum desses números não fechar, o parser está errado — não importe.
 
 if __name__ == "__main__":

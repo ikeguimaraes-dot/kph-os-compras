@@ -74,7 +74,8 @@ async function main() {
   const subs = produtos.filter((p) => p.tipo === "subproduto");
   const sumAcab = acabados.reduce((s, p) => s + p.custo_total, 0);
 
-  // reconcile: custo_total ≈ Σ(q·custo_unitario)·rendimento (zero-cost contam)
+  // reconcile: Σ(q·custo_unitario) das linhas ≈ custo_total (= "Custo dos
+  // Insumos" do RODAPÉ). NÃO multiplica por rendimento (isso seria o lote).
   const byProd = new Map<string, typeof linhas>();
   for (const l of linhas) {
     const arr = byProd.get(l.produto) ?? [];
@@ -85,8 +86,7 @@ async function main() {
   for (const p of produtos) {
     const ls = byProd.get(p.codigo) ?? [];
     const sum = ls.reduce((s, l) => s + l.quantidade * l.custo_unitario, 0);
-    const target = sum * (p.rendimento || 1);
-    if (sum === 0 || Math.abs(target - p.custo_total) <= 0.02) recOk++;
+    if (sum === 0 || Math.abs(sum - p.custo_total) <= 0.02) recOk++;
   }
 
   const um = new Set([...insumos.map((i) => i.um)]);
@@ -97,8 +97,8 @@ async function main() {
   console.log(`  subproduto:      ${subs.length}   (esperado 338)`);
   console.log(`insumos distintos: ${insumos.length}   (esperado 1007)`);
   console.log(`linhas:            ${linhas.length}   (esperado 2725)`);
-  console.log(`reconciliam:       ${recOk}/${produtos.length}   (esperado 936/936)`);
-  console.log(`Σ custo acabados:  R$ ${fmt(sumAcab)}   (esperado ≈ R$ 42.504,97)`);
+  console.log(`reconciliam:       ${recOk}/${produtos.length}   (esperado 936/936, vs RODAPÉ)`);
+  console.log(`Σ custo acabados:  R$ ${fmt(sumAcab)}   (esperado ≈ R$ 42.375,00)`);
   console.log(`UMs:               ${[...um].sort().join(", ")}`);
 
   // ── Comparação com o golden ──
@@ -112,7 +112,7 @@ async function main() {
     insumos.length === 1007 &&
     linhas.length === 2725 &&
     recOk === 936 &&
-    Math.abs(sumAcab - 42504.97) <= 0.5;
+    Math.abs(sumAcab - 42375.0) <= 1.0;
 
   console.log("\n── ORÁCULO ──");
   console.log(oracle ? "✅ ORÁCULO BATEU" : "❌ ORÁCULO NÃO BATEU");

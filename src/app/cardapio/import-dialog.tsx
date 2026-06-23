@@ -51,17 +51,17 @@ function reconcile(parsed: ParsedFichas): Reconcile {
   let ok = 0;
   for (const p of parsed.produtos) {
     const ls = byProd.get(p.codigo) ?? [];
+    // custo_total = Σ(q·cu) (rodapé "Custo dos Insumos"); sem × rendimento.
     const sum = ls.reduce((s, l) => s + l.quantidade * l.custo_unitario, 0);
-    const calc = sum * (p.rendimento || 1);
-    if (sum === 0 || Math.abs(calc - p.custo_total) <= 0.02) {
+    if (Math.abs(sum - p.custo_total) <= 0.02) {
       ok++;
     } else {
       divergentes.push({
         codigo: p.codigo,
         nome: p.nome,
         declarado: Math.round(p.custo_total * 100) / 100,
-        calculado: Math.round(calc * 100) / 100,
-        diff: Math.round((calc - p.custo_total) * 100) / 100,
+        calculado: Math.round(sum * 100) / 100,
+        diff: Math.round((sum - p.custo_total) * 100) / 100,
       });
     }
   }
