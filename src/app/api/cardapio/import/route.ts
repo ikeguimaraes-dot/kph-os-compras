@@ -267,14 +267,14 @@ export async function POST(req: Request) {
       .filter((l) => miByCode.has(l.produto))
       .map((l) => ({
         menu_item_id: miByCode.get(l.produto)!,
-        unit_id: unitId,
         ingredient_id: ingByCode.get(l.insumo) ?? null,
         insumo: l.nome,
         unidade: mapUnidade(l.um),
         quantidade: l.quantidade,
         custo_unitario: l.custo_unitario,
         perda_pct: l.perda_pct,
-        // custo_total é GENERATED — NÃO inserir.
+        // sem unit_id (coluna não existe — a unidade vem por menu_item_id →
+        // menu_items.unit_id) e sem custo_total (é GENERATED).
       }));
     let recipeLines = 0;
     for (const chunk of chunks(recipeRows, BATCH)) {
