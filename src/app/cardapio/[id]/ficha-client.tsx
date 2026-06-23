@@ -37,13 +37,7 @@ import {
 } from "@/lib/cardapio/types";
 import { CATEGORIA_LABELS } from "@kph/db/types/compras-ingredientes";
 import type { RecipeItemWithIngredient } from "@kph/db/types/compras-ingredientes";
-import {
-  updateRecipeItemExtended,
-  removeRecipeItemExtended,
-  addRecipeItemWithIngredient,
-  addRecipeNote,
-  removeRecipeNote,
-} from "@/lib/compras/recipe-actions";
+import { addRecipeNote, removeRecipeNote } from "@/lib/compras/recipe-actions";
 import {
   updateMenuItemPreco,
   updateMenuItemCategoria,
@@ -87,7 +81,9 @@ export function FichaClient({
 
   const [preco, setPreco] = useState(ficha.preco_venda ? String(ficha.preco_venda) : "");
   const [categoria, setCategoria] = useState(ficha.categoria);
-  const [items, setItems] = useState(initialItems);
+  // Lista de insumos é somente leitura — o único editor de recipe_items é o
+  // import do PDF. Edição manual (add/update/remove) foi removida da UI.
+  const items = initialItems;
   const [notes, setNotes] = useState(initialNotes);
   const [novaNota, setNovaNota] = useState("");
   const [savingMsg, setSavingMsg] = useState<string | null>(null);
@@ -130,24 +126,6 @@ export function FichaClient({
     startTransition(async () => {
       const r = await updateMenuItemCategoria(ficha.id, next);
       if (r.ok) { flash("Categoria salva"); router.refresh(); }
-      else flash(r.error);
-    });
-  }
-
-  function patchItem(id: string, patch: { quantidade?: number; custo_unitario?: number; perda_pct?: number | null }) {
-    startTransition(async () => {
-      const r = await updateRecipeItemExtended(id, ficha.id, patch);
-      if (r.ok) {
-        setItems((prev) => prev.map((x) => (x.id === id ? { ...x, ...r.data } : x)));
-        flash("Linha atualizada");
-      } else flash(r.error);
-    });
-  }
-
-  function removeItem(id: string) {
-    startTransition(async () => {
-      const r = await removeRecipeItemExtended(id, ficha.id);
-      if (r.ok) { setItems((prev) => prev.filter((x) => x.id !== id)); flash("Insumo removido"); }
       else flash(r.error);
     });
   }
@@ -340,12 +318,12 @@ export function FichaClient({
               <TableHead style={{ textAlign: "right" }}>Custo unit.</TableHead>
               <TableHead style={{ textAlign: "right" }}>Perda %</TableHead>
               <TableHead style={{ textAlign: "right" }}>Custo total</TableHead>
-              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.map((r) => {
               const drill = ingredientMenuItemId(r);
+              const perda = Number(r.perda_pct ?? 0);
               return (
                 <TableRow key={r.id}>
                   <TableCell style={{ fontSize: 13, color: "var(--text)" }}>
@@ -368,46 +346,26 @@ export function FichaClient({
                       <span style={{ fontWeight: 500 }}>{r.insumo}</span>
                     )}
                   </TableCell>
-                  <TableCell style={{ textAlign: "right" }}>
-                    <NumCell
-                      value={Number(r.quantidade)}
-                      onCommit={(v) => patchItem(r.id, { quantidade: v })}
-                    />
+                  <TableCell style={{ textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+                    {Number(r.quantidade).toLocaleString("pt-BR", { maximumFractionDigits: 4 })}
                   </TableCell>
                   <TableCell style={{ textAlign: "center", fontSize: 11, color: "var(--text-3)", textTransform: "uppercase" }}>
                     {r.unidade ?? "—"}
                   </TableCell>
-                  <TableCell style={{ textAlign: "right" }}>
-                    <NumCell
-                      value={Number(r.custo_unitario)}
-                      onCommit={(v) => patchItem(r.id, { custo_unitario: v })}
-                      money
-                    />
+                  <TableCell style={{ textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+                    {formatBRL(Number(r.custo_unitario))}
                   </TableCell>
-                  <TableCell style={{ textAlign: "right" }}>
-                    <NumCell
-                      value={Number(r.perda_pct ?? 0)}
-                      onCommit={(v) => patchItem(r.id, { perda_pct: v })}
-                    />
+                  <TableCell style={{ textAlign: "right", fontSize: 12, color: "var(--text-3)", fontVariantNumeric: "tabular-nums" }}>
+                    {perda > 0 ? `${perda.toFixed(1)}%` : "—"}
                   </TableCell>
                   <TableCell style={{ textAlign: "right", fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
                     {formatBRL(Number(r.custo_total))}
-                  </TableCell>
-                  <TableCell style={{ textAlign: "right" }}>
-                    <button
-                      onClick={() => removeItem(r.id)}
-                      aria-label="Remover"
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-3)", padding: 4 }}
-                    >
-                      <Trash2 size={15} />
-                    </button>
                   </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
-        <AddInsumoRow menuItemId={ficha.id} onAdded={(row) => setItems((p) => [...p, row])} onError={flash} />
       </div>
 
       {/* Notas */}
@@ -498,126 +456,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function NumCell({
-  value,
-  onCommit,
-  money,
-}: {
-  value: number;
-  onCommit: (v: number) => void;
-  money?: boolean;
-}) {
-  const [draft, setDraft] = useState(String(value));
-  return (
-    <input
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onFocus={(e) => e.target.select()}
-      onBlur={() => {
-        const v = Number(draft.replace(",", "."));
-        if (Number.isFinite(v) && v !== value) onCommit(v);
-        else setDraft(String(value));
-      }}
-      style={{
-        width: money ? 84 : 64,
-        textAlign: "right",
-        fontSize: 13,
-        background: "transparent",
-        border: "1px solid transparent",
-        borderRadius: 6,
-        color: "var(--text)",
-        outline: "none",
-        padding: "2px 4px",
-        fontVariantNumeric: "tabular-nums",
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.border = "1px solid var(--border)")}
-      onMouseLeave={(e) => (e.currentTarget.style.border = "1px solid transparent")}
-    />
-  );
-}
-
-function AddInsumoRow({
-  menuItemId,
-  onAdded,
-  onError,
-}: {
-  menuItemId: string;
-  onAdded: (row: RecipeItemWithIngredient) => void;
-  onError: (msg: string) => void;
-}) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
-  const [open, setOpen] = useState(false);
-  const [insumo, setInsumo] = useState("");
-  const [qtd, setQtd] = useState("");
-  const [custo, setCusto] = useState("");
-  const [unidade, setUnidade] = useState("");
-  const [perda, setPerda] = useState("");
-
-  function add() {
-    const quantidade = Number(qtd.replace(",", "."));
-    if (!insumo.trim() || !(quantidade > 0)) { onError("Informe insumo e quantidade"); return; }
-    startTransition(async () => {
-      const r = await addRecipeItemWithIngredient({
-        menu_item_id: menuItemId,
-        insumo: insumo.trim(),
-        quantidade,
-        unidade: unidade.trim() || null,
-        custo_unitario: Number(custo.replace(",", ".")) || 0,
-        perda_pct: perda ? Number(perda.replace(",", ".")) : null,
-      });
-      if (r.ok) {
-        onAdded({ ...r.data, ingredient: null } as RecipeItemWithIngredient);
-        setInsumo(""); setQtd(""); setCusto(""); setUnidade(""); setPerda("");
-        setOpen(false);
-        router.refresh();
-      } else onError(r.error);
-    });
-  }
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        style={{
-          width: "100%",
-          padding: "10px 16px",
-          background: "transparent",
-          border: "none",
-          borderTop: "1px solid var(--border)",
-          color: "var(--text-3)",
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        <Plus size={14} /> Adicionar insumo
-      </button>
-    );
-  }
-
-  const inp: React.CSSProperties = {
-    fontSize: 13,
-    padding: "6px 8px",
-    background: "var(--surface)",
-    border: "1px solid var(--border)",
-    borderRadius: 6,
-    color: "var(--text)",
-    outline: "none",
-  };
-
-  return (
-    <div style={{ borderTop: "1px solid var(--border)", padding: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      <input style={{ ...inp, flex: 2, minWidth: 160 }} placeholder="Nome do insumo" value={insumo} onChange={(e) => setInsumo(e.target.value)} autoFocus />
-      <input style={{ ...inp, width: 70, textAlign: "right" }} placeholder="Qtd" value={qtd} onChange={(e) => setQtd(e.target.value)} />
-      <input style={{ ...inp, width: 60 }} placeholder="Un" value={unidade} onChange={(e) => setUnidade(e.target.value)} />
-      <input style={{ ...inp, width: 90, textAlign: "right" }} placeholder="Custo un." value={custo} onChange={(e) => setCusto(e.target.value)} />
-      <input style={{ ...inp, width: 70, textAlign: "right" }} placeholder="Perda %" value={perda} onChange={(e) => setPerda(e.target.value)} />
-      <Button onClick={add} style={{ gap: 4 }}><Plus size={14} /> Salvar</Button>
-      <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-    </div>
-  );
-}
