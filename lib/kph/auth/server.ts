@@ -8,6 +8,7 @@ import type { RoleName } from "@kph/db/types/database";
 export type CurrentUser = {
   id: string;
   email: string | null;
+  displayName: string | null;
   roles: Array<{
     role: RoleName;
     unitId: string | null;
@@ -71,9 +72,15 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       };
     });
 
+    const metadata = (user.user_metadata ?? {}) as Record<string, unknown>;
+    const displayName = [metadata.display_name, metadata.full_name, metadata.name]
+      .find((value): value is string => typeof value === "string" && value.trim().length > 0)
+      ?.trim() ?? null;
+
     return {
       id: user.id,
       email: user.email ?? null,
+      displayName,
       roles,
     };
   } catch (e) {
@@ -95,16 +102,12 @@ function isNextInternal(e: unknown): boolean {
   return typeof message === "string" && message.includes("Dynamic server usage");
 }
 
-/** AUTH DESATIVADO — retorna user bypass quando não há sessão. */
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (user) return user;
-  // UUID fixo seedado em 039_seed_bypass_user.sql — satisfaz FK auth.users(id).
-  return {
-    id: "00000000-0000-0000-0000-000000000001",
-    email: "bypass@kph.os",
-    roles: [{ role: "founder" as RoleName, unitId: null, brandId: null, groupId: null }],
-  };
+  const shell = process.env.NEXT_PUBLIC_SHELL_URL?.replace(/\/$/, "") ??
+    (process.env.NODE_ENV === "development" ? "http://localhost:3000" : "https://kph-os.vercel.app");
+  redirect(`${shell}/login`);
 }
 
 /** Falha se o user não tiver pelo menos uma das roles especificadas. */
