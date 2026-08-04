@@ -18,7 +18,7 @@ import {
   // pessoas
   Users, User, Briefcase, CalendarDays, Clock, Plane, CalendarX2, Timer,
   ShieldAlert, Receipt, DollarSign, Bus, GraduationCap, ClipboardCheck,
-  FolderOpen, Upload, FileBarChart2, MessageCircle, Repeat2, LayoutGrid, ListChecks, CalendarClock, Network, UserPlus, BarChart2,
+  FolderOpen, Upload, FileBarChart2, MessageCircle, Repeat2, LayoutGrid, ListChecks, CalendarClock, Network, UserPlus, BarChart2, Calculator,
   // comercial
   Handshake, MessageSquare, CalendarCheck, Bot, Megaphone, Filter,
   // marca
@@ -106,7 +106,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Zap, Settings, Wrench, Landmark, BadgeDollarSign,
   Users, User, Briefcase, CalendarDays, Clock, Plane, CalendarX2, Timer,
   ShieldAlert, Receipt, DollarSign, Bus, GraduationCap, ClipboardCheck,
-  FolderOpen, Upload, FileBarChart2, MessageCircle, Repeat2, LayoutGrid, ListChecks, CalendarClock, Network, UserPlus, BarChart2,
+  FolderOpen, Upload, FileBarChart2, MessageCircle, Repeat2, LayoutGrid, ListChecks, CalendarClock, Network, UserPlus, BarChart2, Calculator,
   Handshake, MessageSquare, CalendarCheck, Bot, Megaphone, Filter,
   Bookmark, Info, Globe, Award,
   Brain, Target, LineChart, Layers, Bug, Map, BarChart3, Workflow,
