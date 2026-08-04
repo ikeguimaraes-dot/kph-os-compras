@@ -16,7 +16,7 @@ export default async function ComprasLayout({
     <AuthProvider user={user} units={units}>
       <div style={{ display: "flex", height: "100vh" }}>
         <Sidebar />
-        <main style={{ flex: 1, overflowY: "auto", padding: "32px 28px" }}>
+        <main className="shell-main kph-page-main" style={{ flex: 1, overflowY: "auto", padding: "32px 28px" }}>
           {children}
         </main>
       </div>

@@ -159,6 +159,32 @@
 }
 
 /* ── KPH Shell Responsivo ── */
+.kph-page-main {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(196, 98, 45, 0.045), transparent 28rem),
+    var(--bg);
+  color: var(--text);
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.kph-page-main :where(button, input, select, textarea) {
+  font-family: var(--font-sans);
+}
+
+.kph-page-main :where(h1, h2) {
+  color: var(--text);
+  text-wrap: balance;
+}
+
+.kph-page-main :where(table) {
+  font-variant-numeric: tabular-nums;
+}
+
+.kph-page-main ::selection {
+  background: var(--brand-soft);
+  color: var(--text);
+}
+
 @media (max-width: 767px) {
   .shell-nav-item {
     min-height: 44px;
