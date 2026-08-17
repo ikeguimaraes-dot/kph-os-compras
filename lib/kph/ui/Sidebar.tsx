@@ -285,11 +285,9 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Bookmark,
     defaultOpen: false,
     items: [
+      { href: "/marca",               label: "Visão Geral", icon: LayoutDashboard },
       { href: "/marcas",              label: "Diretório",    icon: Building2 },
-      { href: "/marca/brandbook",     label: "BrandBook",    icon: BookOpen },
-      { href: "/marca/quem-somos",    label: "Quem Somos",   icon: Info },
       { href: "/marca/canais",        label: "Site & Canais", icon: Globe },
-      { href: "/marca/reputacao",     label: "Reputação",    icon: Award },
     ],
   },
   {
