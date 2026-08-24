@@ -131,13 +131,26 @@ function convertItem(item: RemoteNavItem): NavItem {
 }
 
 function convertRemoteGroups(remote: RemoteNavGroup[]): NavGroup[] {
-  return remote.map((g) => ({
-    id: g.id,
-    title: g.label,
-    icon: g.icon ? resolveIcon(g.icon) : null,
-    defaultOpen: g.defaultOpen,
-    items: g.items.map(convertItem),
-  }));
+  return remote.map((g) => {
+    const items = g.items.map(convertItem);
+
+    if (g.id === "financeiro" && !items.some((item) => item.href === "/financeiro/fluxo")) {
+      const cockpitIndex = items.findIndex((item) => item.href === "/financeiro");
+      items.splice(cockpitIndex >= 0 ? cockpitIndex + 1 : 0, 0, {
+        href: "/financeiro/fluxo",
+        label: "Fluxo de Caixa",
+        icon: ArrowLeftRight,
+      });
+    }
+
+    return {
+      id: g.id,
+      title: g.label,
+      icon: g.icon ? resolveIcon(g.icon) : null,
+      defaultOpen: g.defaultOpen,
+      items,
+    };
+  });
 }
 
 // ── Flatten all leaf hrefs (including children) ─────────────────────────────
