@@ -67,6 +67,9 @@ type RemoteNavGroup = {
 };
 
 function getZone(pathname: string): string {
+  if (pathname === "/escritorio" || pathname.startsWith("/escritorio/")) {
+    return "marca";
+  }
   if (pathname === "/orquestrador" || pathname.startsWith("/orquestrador/")) {
     return "inteligencia";
   }
@@ -299,6 +302,7 @@ const NAV_GROUPS: NavGroup[] = [
     defaultOpen: false,
     items: [
       { href: "/marca",               label: "Visão Geral", icon: LayoutDashboard },
+      { href: "/escritorio",          label: "Escritório",  icon: Building2 },
       { href: "/marcas",              label: "Diretório",    icon: Building2 },
       { href: "/marca/brandbook",     label: "BrandBook",    icon: BookOpen },
       { href: "/marca/quem-somos",    label: "Quem Somos",   icon: Info },
