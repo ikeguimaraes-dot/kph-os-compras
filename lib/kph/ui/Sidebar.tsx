@@ -602,7 +602,7 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
   // Group open/close (persisted in localStorage)
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
     const m: Record<string, boolean> = {};
-    for (const g of groups) m[g.id] = g.defaultOpen;
+    for (const g of groups) m[g.id] = !g.title;
     return m;
   });
   const [hydrated, setHydrated] = useState(false);
@@ -610,6 +610,12 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
+      if (pathname === "/dashboard") {
+        window.localStorage.removeItem(STORAGE_KEY);
+        setOpenMap(Object.fromEntries(groups.map((g) => [g.id, !g.title])));
+        setHydrated(true);
+        return;
+      }
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Record<string, boolean>;
@@ -617,14 +623,14 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
       }
     } catch {}
     setHydrated(true);
-  }, []);
+  }, [pathname, groups]);
 
   // When remote groups load, add any missing group IDs
   useEffect(() => {
     setOpenMap((prev) => {
       const next = { ...prev };
       for (const g of groups) {
-        if (next[g.id] === undefined) next[g.id] = g.defaultOpen;
+        if (next[g.id] === undefined) next[g.id] = !g.title;
       }
       return next;
     });
@@ -641,6 +647,29 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
       try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
+  }
+
+  function firstGroupHref(group: NavGroup): string | null {
+    const landingByGroup: Record<string, string> = {
+      operacao: "/operacao", compras: "/compras", financeiro: "/financeiro",
+      pessoas: "/pessoas", comercial: "/comercial", marca: "/escritorio",
+      admin: "/admin/categorias", inteligencia: "/inteligencia",
+    };
+    const preferred = landingByGroup[group.id];
+    if (preferred && flattenHrefs([group]).some((item) => item.href === preferred)) return preferred;
+    for (const item of group.items) {
+      if (item.href) return item.href;
+      const childHref = item.children?.find((child) => child.href)?.href;
+      if (childHref) return childHref;
+    }
+    return null;
+  }
+
+  function handleGroupClick(group: NavGroup, isOpen: boolean) {
+    toggleGroup(group.id);
+    if (isOpen) return;
+    const firstHref = firstGroupHref(group);
+    if (firstHref && firstHref !== pathname) window.location.assign(firstHref);
   }
 
   // Sub-menu open/close (not persisted — driven by defaultOpen + active path)
@@ -683,13 +712,13 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
   return (
     <nav style={{ flex: 1, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 4, overflowY: "auto" }}>
       {groups.map((g) => {
-        const isOpen = openMap[g.id] ?? g.defaultOpen;
+        const isOpen = openMap[g.id] ?? !g.title;
         return (
           <div key={g.id} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {g.title && (
               <button
                 type="button"
-                onClick={() => toggleGroup(g.id)}
+                onClick={() => handleGroupClick(g, isOpen)}
                 aria-expanded={isOpen}
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
