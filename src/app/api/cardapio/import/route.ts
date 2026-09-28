@@ -6,6 +6,7 @@
 // Regras do repo: runtime nodejs + CORS em toda resposta + service role.
 
 import { createServiceClient } from "@kph/db/supabase/server";
+import { authenticateApi, canAccessUnit } from "@kph/auth/api";
 import {
   UM_MAP,
   type ParsedFichas,
@@ -65,6 +66,9 @@ export async function POST(req: Request) {
     return json({ error: "parsed inválido (esperado {produtos, insumos, linhas})" }, 400);
   }
 
+  const user = await authenticateApi();
+  if (!user) return json({ error: "Nao autenticado" }, 401);
+
   const supabase = createServiceClient();
   if (!supabase) return json({ error: "Supabase service role indisponível" }, 500);
 
@@ -82,6 +86,9 @@ export async function POST(req: Request) {
   const groupId = Array.isArray(brandsJoin) ? brandsJoin[0]?.group_id : brandsJoin?.group_id;
   if (!brandId || !groupId) {
     return json({ error: "não foi possível resolver brand_id/group_id da unit" }, 500);
+  }
+  if (!canAccessUnit(user, { id: unitId, brand_id: brandId, group_id: groupId }, ["founder", "gm", "chef", "comprador", "operacional"])) {
+    return json({ error: "Acesso negado" }, 403);
   }
 
   // ── 2) Reconciliação (defesa): custo_total = Σ(q·cu) das linhas ──
