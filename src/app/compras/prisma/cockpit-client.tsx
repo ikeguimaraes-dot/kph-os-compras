@@ -512,6 +512,11 @@ export default function CockpitClient({
           <button onClick={() => window.location.reload()}>Recarregar</button>
         </div>
       )}
+      {data?.warnings.map((warning) => (
+        <p className="prisma-alert" role="status" key={warning}>
+          {warning}
+        </p>
+      ))}
       {notice && (
         <div role="status" className="prisma-notice">
           {notice} <a href={detailHref("plano")}>Ver plano →</a>

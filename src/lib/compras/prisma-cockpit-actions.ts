@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { optionalPrismaQuery } from "./prisma-optional-query";
 import { comprasAccess } from "./everest-access";
 import { getPrisma, listPrismaPlan } from "./prisma-actions";
 import {
@@ -42,7 +43,7 @@ async function readRows<T>(
     if (table === "v_prisma_alertas")
       q = q.order("data").order("tipo").order("alvo");
     const { data, error } = await q.range(offset, offset + 999);
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(`${table}: ${error.message}`);
     out.push(...((data ?? []) as T[]));
     if ((data?.length ?? 0) < 1000) return out;
   }
@@ -165,19 +166,17 @@ export async function getCockpit(raw: CockpitFilter) {
       .order("dia")
       .order("descricao_item")
       .limit(500),
-    readRows<{
-      unit_id: string;
-      mes: string;
-      nome_venda: string;
-      dias_disponiveis: number;
-      qtd_disponivel: number;
-      disponibilidade_conhecida: boolean;
-    }>(
-      db,
-      "v_abastecimento_engenharia",
-      unitIds,
-      shiftMonth(f.month, -12),
-      f.month,
+    optionalPrismaQuery(
+      () =>
+        readRows<{
+          unit_id: string;
+          mes: string;
+          nome_venda: string;
+          dias_disponiveis: number;
+          qtd_disponivel: number;
+          disponibilidade_conhecida: boolean;
+        }>(db, "v_abastecimento_engenharia", unitIds, f.month, f.month),
+      "A disponibilidade dos pratos não carregou. A engenharia permanece a validar; tente recarregar.",
     ),
     db
       .from("cardapio_papel")
@@ -185,11 +184,14 @@ export async function getCockpit(raw: CockpitFilter) {
         "produto_venda_ficha_id,papel,produto_venda_ficha(nome_venda,unit_id)",
       )
       .in("unit_id", unitIds),
-    readRows<AlertRow>(db, "v_abastecimento_alertas", unitIds),
+    optionalPrismaQuery(
+      () => readRows<AlertRow>(db, "v_abastecimento_alertas", unitIds),
+      "Os alertas de abastecimento não carregaram. Confira a fila antes de decidir.",
+    ),
   ]);
   if (roles.error) throw new Error(roles.error.message);
   const exposures = new Map(
-    availability.map((r) => [`${r.unit_id}|${r.mes}|${r.nome_venda}`, r]),
+    availability.rows.map((r) => [`${r.unit_id}|${r.mes}|${r.nome_venda}`, r]),
   );
   const brandRoles = new Map(
     (roles.data ?? []).map((r) => {
@@ -237,7 +239,7 @@ export async function getCockpit(raw: CockpitFilter) {
     purchases,
     captures: plan.rows,
     ownerTargets,
-    alerts: [...alerts, ...supplyAlerts],
+    alerts: [...alerts, ...supplyAlerts.rows],
     analysis: cleanAnalysis,
     aliases,
     anchors,
@@ -259,6 +261,9 @@ export async function getCockpit(raw: CockpitFilter) {
   }));
   return {
     ...result,
+    warnings: [availability.warning, supplyAlerts.warning].filter(
+      (w): w is string => w !== null,
+    ),
     stockClosings: inventory.data ?? [],
     stockMissing: missingStock.data ?? [],
   };
