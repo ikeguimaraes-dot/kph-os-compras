@@ -344,26 +344,6 @@ export function Sidebar(_props?: {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [remoteGroups, setRemoteGroups] = useState<NavGroup[] | null>(null);
 
-  useEffect(() => {
-    const syncSessionCookie = () => {
-      const cookies = document.cookie.split(";").map((item) => item.trim());
-      const auth = cookies.find((item) =>
-        item.startsWith("sb-") && item.slice(0, item.indexOf("=")).includes("auth-token"),
-      );
-      if (auth) {
-        window.localStorage.setItem("kph_auth_browser_backup", auth);
-        return;
-      }
-      const backup = window.localStorage.getItem("kph_auth_browser_backup");
-      if (backup?.startsWith("sb-") && backup.includes("auth-token=")) {
-        document.cookie = `${backup}; Path=/; Max-Age=2592000; SameSite=Lax`;
-      }
-    };
-    syncSessionCookie();
-    const timer = window.setInterval(syncSessionCookie, 250);
-    return () => window.clearInterval(timer);
-  }, []);
-
   // ── (a) Unit switcher click-outside handler
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -410,12 +390,14 @@ export function Sidebar(_props?: {
         ?.map(filterItem)
         .filter((child): child is NavItem => child !== null);
       if (item.children && !children?.length) return null;
-      return { ...item, children };
+      return { ...item, href: item.href === '/cardapio' ? '/compras/cardapio' : item.href, children };
     };
     return source
       .map((group) => ({
         ...group,
-        items: group.items.map(filterItem).filter((item): item is NavItem => item !== null),
+        items: (group.id === 'compras' && !group.items.some(item => item.href === '/compras/prisma')
+          ? [{label:'Prisma de Compras',href:'/compras/prisma',icon:PieChart},...group.items]
+          : group.items).map(filterItem).filter((item): item is NavItem => item !== null),
       }))
       .filter((group) => group.items.length > 0);
   }, [remoteGroups, userRoles]);
@@ -544,7 +526,7 @@ export function Sidebar(_props?: {
             </div>
             <div style={{ fontSize: 10, color: "var(--text-3)" }}>{role}</div>
           </div>
-          <Link
+          <a
             href="/auth/sign-out"
             title="Sair"
             style={{
@@ -555,7 +537,7 @@ export function Sidebar(_props?: {
             }}
           >
             <LogOut size={14} />
-          </Link>
+          </a>
         </div>
       </aside>
     </>

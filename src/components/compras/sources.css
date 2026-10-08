@@ -1,0 +1,152 @@
+.source-page {
+  max-width: 1250px;
+  margin: auto;
+}
+.source-page h1 {
+  font-family: Georgia, serif;
+  font-size: 42px;
+  margin: 14px 0;
+}
+.source-page h2 {
+  font-family: Georgia, serif;
+  font-size: 28px;
+}
+.source-page p {
+  line-height: 1.6;
+}
+.source-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  margin-top: 32px;
+}
+.source-nav {
+  display: flex;
+  gap: 20px;
+  overflow: auto;
+  white-space: nowrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #80908444;
+  font-size: 13px;
+}
+.source-filters {
+  display: flex;
+  align-items: end;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 28px 0;
+}
+.source-filters label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  min-width: 170px;
+  flex: 1;
+}
+.source-page input,
+.source-page select,
+.source-dialog input {
+  background: var(--background, white);
+  color: inherit;
+  border: 1px solid #80908466;
+  border-radius: 5px;
+  padding: 10px;
+  min-height: 44px;
+}
+.source-page button {
+  border: 1px solid #80908466;
+  border-radius: 5px;
+  padding: 8px 14px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.source-page button:disabled {
+  opacity: 0.4;
+}
+.source-scroll {
+  overflow: auto;
+}
+.source-page table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+.source-page th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  padding: 14px 12px;
+  background: #8090840c;
+}
+.source-page td {
+  padding: 16px 12px;
+  border-bottom: 1px solid #80908433;
+}
+.source-page footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 24px 0;
+}
+.source-summary {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 24px;
+  background: #75896c12;
+  border: 1px solid #75896c55;
+  border-radius: 8px;
+}
+.source-summary strong {
+  font-size: 22px;
+  white-space: nowrap;
+}
+.source-summary span {
+  font-size: 12px;
+  max-width: 420px;
+}
+.source-dialog {
+  position: fixed;
+  inset: 0 0 0 auto;
+  margin: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  max-width: min(950px, 95vw);
+  width: 950px;
+  background: var(--background, #fff);
+  color: var(--foreground, #202820);
+  padding: 32px;
+  border: 0;
+  box-shadow: -10px 0 80px #0003;
+}
+.source-dialog::backdrop {
+  background: #0006;
+}
+.source-close {
+  float: right;
+}
+.source-page :focus-visible {
+  outline: 3px solid #789c55;
+  outline-offset: 3px;
+}
+.source-page [role="alert"] {
+  padding: 16px;
+  background: #cc444420;
+  color: #a32b2b;
+}
+@media (max-width: 600px) {
+  .source-filters {
+    display: grid;
+  }
+  .source-summary {
+    display: grid;
+    gap: 10px;
+  }
+  .source-page h1 {
+    font-size: 32px;
+  }
+  .source-dialog {
+    padding: 20px;
+  }
+}
