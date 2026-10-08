@@ -23,4 +23,3 @@ begin
  join public.lorean_produtos_dia p on p.workday_id_fk=w.id and public.abastecimento_nome(p.produto)=public.abastecimento_nome(b.nome_venda) and p.qtd>0
  where a.retomada_pdv_em is null group by a.id)x where a.id=x.id;
 end $$;
-
