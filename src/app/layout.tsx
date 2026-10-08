@@ -20,8 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KPH Compras",
-  description: "Módulo de compras do grupo KPH.",
+  title: { default: "GHOS · Compras", template: "%s · GHOS" },
+  description: "Compras, abastecimento e inteligência de margem do Grupo KPH.",
 };
 
 export default function RootLayout({
@@ -32,7 +32,8 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`dark ${fraunces.variable} ${instrumentSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${fraunces.variable} ${instrumentSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground flex flex-col">
         {children}
