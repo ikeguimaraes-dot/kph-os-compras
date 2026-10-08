@@ -44,3 +44,4 @@ As versões posteriores à consolidação são alterações novas, aplicadas uma
 | 20261008182834 | prisma_abastecimento_sugestoes_recentes |
 | 20261008183118 | prisma_abastecimento_guardas_alertas |
 | 20261008183558 | prisma_abastecimento_metas_retomada |
+| 20261008185539 | prisma_abastecimento_dia_operacional_inicial |
