@@ -91,6 +91,7 @@ export default function SupplyClient({ mode = "rotina" }: { mode?: Mode }) {
         <a href="/compras/prisma">← Prisma</a>
         {[
           ["/compras/abastecimento", "Rotina"],
+          ["/compras/prisma/mapa", "Mapa de dependências"],
           ["/compras/abastecimento/acordos", "Acordos"],
           ["/compras/abastecimento/cardapio", "Papel na marca"],
           ["/compras/abastecimento/matriz", "Matriz e cotações"],

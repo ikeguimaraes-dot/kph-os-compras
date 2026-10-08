@@ -425,6 +425,7 @@ export default function CockpitClient({
         <a href="/compras">Compras</a>
         <span>/ Prisma</span>
         <a href="/compras/abastecimento">Rotina de abastecimento ↗</a>
+        <a href="/compras/prisma/mapa">Mapa de dependências ↗</a>
         <a href="/compras/fichas">Revisar fichas ↗</a>
         <div>
           {[
