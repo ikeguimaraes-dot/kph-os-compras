@@ -15,23 +15,23 @@ export default function GhosHome() {
   return (
     <div className="ghos-home">
       <div className="ghos-home-kicker">
-        <span>GHOS / COMPRAS & ABASTECIMENTO</span>
+        <span>GHOST / COMPRAS & ABASTECIMENTO</span>
         <span>Hospitalidade por método.</span>
       </div>
       <section className="ghos-hero" aria-labelledby="ghos-title">
         <div>
-          <p className="ghos-eyebrow">DA ORIGEM À MESA</p>
+          <p className="ghos-eyebrow">NOS BASTIDORES DA HOSPITALIDADE</p>
           <h1 id="ghos-title">
             Comprar bem.
             <br />
             Servir <em>melhor.</em>
           </h1>
           <p className="ghos-hero-copy">
-            Cada escolha na compra chega à mesa.
+            O trabalho acontece nos bastidores.
             <br />
-            Cuide do abastecimento, proteja a margem
-            <br className="ghos-desktop-break" /> e mantenha o que faz cada casa
-            ser única.
+            O cuidado aparece em cada mesa.
+            <br />
+            Compras, abastecimento e margem, em sintonia.
           </p>
           <Link className="ghos-primary" href="/compras/abastecimento">
             Começar pela rotina <ArrowRight size={18} />
@@ -44,7 +44,7 @@ export default function GhosHome() {
             <span className="ghos-orbit-right">MÉTODO</span>
             <span className="ghos-orbit-bottom">MESA</span>
           </div>
-          <p>O cuidado começa antes do serviço.</p>
+          <p>Presença em cada detalhe.</p>
         </div>
       </section>
       <section
@@ -138,7 +138,7 @@ export default function GhosHome() {
       </section>
       <footer className="ghos-home-footer">
         <span>
-          GHOS <i>·</i> Grupo KPH
+          GHOST <i>·</i> Grupo KPH
         </span>
         <Link href="/compras/prisma/estrategia">
           Nossa estratégia de compras <ArrowRight size={14} />
