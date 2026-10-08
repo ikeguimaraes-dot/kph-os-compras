@@ -183,3 +183,33 @@ test("month boundaries preserve leap years and December rollover", () => {
   assert.equal(shiftMonth("2026-01-01", -1), "2025-12-01");
   assert.equal(monthEnd("2024-02-01"), "2024-02-29");
 });
+
+test("price index exposes packaging-sized variations instead of presenting verified inflation", () => {
+  const idx = priceIndex(
+    [
+      buy("A", 100, { mes: "2026-07-01", quantidade: 10 }),
+      buy("A", 120, { mes: "2026-08-01", quantidade: 10 }),
+      buy("A", 400, { mes: "2026-09-01", quantidade: 10 }),
+    ],
+    ["2026-07-01", "2026-08-01", "2026-09-01"],
+  );
+  assert.equal(idx.suspicious.length, 1);
+  assert.equal(idx.suspicious[0]!.ratio, 4);
+  assert.equal(idx.points.at(-1)!.value, 400);
+});
+
+test("basket uses the 12 months before the reference month, not before the trend begins", () => {
+  const rows = [
+    buy("A", 100, { mes: "2025-10-01", quantidade: 10 }),
+    buy("A", 120, { mes: "2026-08-01", quantidade: 10 }),
+    buy("A", 150, { mes: "2026-09-01", quantidade: 10 }),
+  ];
+  const months = Array.from({ length: 12 }, (_, i) =>
+    shiftMonth("2026-09-01", i - 11),
+  );
+  const idx = priceIndex(rows, months);
+  assert.equal(idx.items, 1);
+  assert.equal(idx.historyMonths, 2);
+  assert.equal(idx.points[0]!.value, 100);
+  assert.equal(idx.inflation, 50);
+});

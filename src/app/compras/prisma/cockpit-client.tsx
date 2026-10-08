@@ -552,12 +552,20 @@ export default function CockpitClient({
                 formula="Gap = CMV real − (quantidade vendida × custo unitário de fichas confirmadas ÷ receita dos pratos com custo completo no mês). Gap R$ = gap percentual × receita total, uma extrapolação da cesta coberta. Custos somente do Everest."
               />
               <Metric
-                name="Inflação de compra · 12m"
-                value={pct(data.priceIndex.inflation)}
+                name="Inflação de compra · prévia 12m"
+                value={
+                  data.priceIndex.suspicious.length
+                    ? "Validar unidades"
+                    : pct(data.priceIndex.inflation)
+                }
                 detail={
                   <>
                     Base 100 · {data.priceIndex.items}/
                     {data.priceIndex.selected} itens
+                    <small>
+                      Histórico da cesta: {data.priceIndex.historyMonths}/12
+                      meses
+                    </small>
                     <small>
                       Preço observado no mês:{" "}
                       {pct(
@@ -567,11 +575,13 @@ export default function CockpitClient({
                   </>
                 }
                 story={
-                  data.priceIndex.inflation === null
-                    ? "Sem cesta histórica suficiente para medir a inflação."
-                    : `A cesta fixa ${data.priceIndex.inflation >= 0 ? "encareceu" : "barateou"} ${pct(Math.abs(data.priceIndex.inflation))} desde ${label(data.months[0])}.`
+                  data.priceIndex.suspicious.length
+                    ? `${data.priceIndex.suspicious.length} insumos variaram mais de 2,5×. Índice bruto: ${pct(data.priceIndex.inflation)}; conferir unidade e embalagem antes de interpretar como inflação.`
+                    : data.priceIndex.inflation === null
+                      ? "Sem cesta histórica suficiente para medir a inflação."
+                      : `A cesta fixa ${data.priceIndex.inflation >= 0 ? "encareceu" : "barateou"} ${pct(Math.abs(data.priceIndex.inflation))} desde ${label(data.months[0])}.`
                 }
-                formula="Laspeyres: Σ quantidade fixa × preço do mês ÷ Σ quantidade fixa × preço base. Cesta: até 80 itens de maior gasto nos 12 meses anteriores ao início da série. Sem compra no mês, carrega último preço observado por até 12 meses, com cobertura explícita. Não mede causalmente o resultado das negociações."
+                formula="Laspeyres: Σ quantidade fixa × preço do mês ÷ Σ quantidade fixa × preço base. Cesta fixa para a série: até 80 itens de maior gasto nos 12 meses anteriores ao mês de referência. Base 100 no primeiro mês da série; itens sem preço base ficam fora, com cobertura explícita. Sem compra no mês, carrega último preço observado por até 12 meses. Não mede causalmente o resultado das negociações."
               />
               <Metric
                 name="Economia capturada · ano"
@@ -778,7 +788,23 @@ export default function CockpitClient({
               </Formula>
               <div className="cockpit-house-grid">
                 <section className="cockpit-panel">
-                  <h3>O preço que veio</h3>
+                  <h3>O preço que veio · índice bruto</h3>
+                  {data.priceIndex.suspicious.length > 0 && (
+                    <details className="cockpit-formula">
+                      <summary>
+                        Conferir {data.priceIndex.suspicious.length} insumos com
+                        variação acima de 2,5×
+                      </summary>
+                      <ul>
+                        {data.priceIndex.suspicious.map((item) => (
+                          <li key={item.item}>
+                            {item.name}: {money(item.min)} a {money(item.max)} ·{" "}
+                            {num(item.ratio)}×. Conferir unidade da nota.
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
                   <Trend
                     months={data.months}
                     percent={false}

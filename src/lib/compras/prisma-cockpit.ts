@@ -309,11 +309,21 @@ export function priceIndex(rows: PurchaseRow[], months: string[]) {
       points: [],
       items: 0,
       selected: 0,
+      historyMonths: 0,
+      suspicious: [] as {
+        item: string;
+        name: string;
+        min: number;
+        max: number;
+        ratio: number;
+      }[],
       baseCoverage: null,
       inflation: null,
     };
+  const reference = months.at(-1)!;
   const past = rows.filter(
-    (r) => r.mes < first && r.mes >= shiftMonth(first, -12) && r.item_id,
+    (r) =>
+      r.mes < reference && r.mes >= shiftMonth(reference, -12) && r.item_id,
   );
   const basket = [...group(past, (r) => r.item_id!)]
     .map(([item, v]) => ({
@@ -344,6 +354,28 @@ export function priceIndex(rows: PurchaseRow[], months: string[]) {
       .filter(([d]) => d <= m && d >= shiftMonth(m, -12))
       .sort(([a], [b]) => b.localeCompare(a))[0]?.[1];
   const eligible = basket.filter((b) => last(b.item, first) !== undefined);
+  const suspicious = eligible
+    .flatMap((b) => {
+      const values = [...(prices.get(b.item) ?? new Map<string, number>())]
+        .filter(([m]) => m >= first && m <= reference)
+        .map(([, v]) => v);
+      const min = Math.min(...values),
+        max = Math.max(...values);
+      return min > 0 && max / min > PRISMA.priceRatioLimit
+        ? [
+            {
+              item: b.item,
+              name: displayName(
+                rows.find((r) => r.item_id === b.item)?.item_nome ?? b.item,
+              ),
+              min,
+              max,
+              ratio: max / min,
+            },
+          ]
+        : [];
+    })
+    .sort((a, b) => b.ratio - a.ratio);
   const base = sum(eligible, (b) => b.q * last(b.item, first)!);
   const points = months.map((month) => {
     const complete = eligible.every((b) => last(b.item, month) !== undefined);
@@ -366,6 +398,8 @@ export function priceIndex(rows: PurchaseRow[], months: string[]) {
     points,
     items: eligible.length,
     selected: basket.length,
+    historyMonths: new Set(past.map((r) => r.mes)).size,
+    suspicious,
     baseCoverage: ratio(
       sum(eligible, (b) => b.spend),
       sum(basket, (b) => b.spend),
