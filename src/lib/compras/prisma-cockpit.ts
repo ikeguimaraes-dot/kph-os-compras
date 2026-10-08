@@ -29,6 +29,10 @@ export type DishRow = {
   ficha_id: string | null;
   status_ponte: string | null;
   custo_unitario: number | null;
+  dias_disponiveis?: number | null;
+  qtd_disponivel?: number;
+  disponibilidade_conhecida?: boolean;
+  papel?: string | null;
 };
 export type PurchaseRow = {
   unit_id: string;
@@ -119,9 +123,13 @@ export function monthly(rows: MonthRow[]) {
   const revenue = sum(rows, (r) => r.receita),
     cost = sum(rows, (r) => r.cmv_real_rs),
     covered = sum(rows, (r) => r.receita_coberta);
-  const incomplete = rows.some(r => r.notas_incompletas === true);
-  const partialRevenue = rows.some(r => r.receita_parcial === true || (r.receita <= 0 && r.comprado_rs > 0));
-  const unverified = rows.some(r => r.notas_incompletas === null || r.receita_parcial === null);
+  const incomplete = rows.some((r) => r.notas_incompletas === true);
+  const partialRevenue = rows.some(
+    (r) => r.receita_parcial === true || (r.receita <= 0 && r.comprado_rs > 0),
+  );
+  const unverified = rows.some(
+    (r) => r.notas_incompletas === null || r.receita_parcial === null,
+  );
   const real = partialRevenue ? null : ratio(cost, revenue),
     theory = ratio(
       sum(rows, (r) => r.custo_teorico_rs ?? 0),
@@ -133,7 +141,9 @@ export function monthly(rows: MonthRow[]) {
       ? sum(withRevenue, (r) => r.receita * r.cmv_meta_pct!) / revenue
       : null;
   return {
-    incomplete, partialRevenue, unverified,
+    incomplete,
+    partialRevenue,
+    unverified,
     revenue,
     cost,
     covered,
@@ -239,7 +249,14 @@ export function menuEngineering(rows: DishRow[]) {
   const groups = group(rows, (r) => `${r.unit_id}|${r.grupo}`);
   return rows.map((d) => {
     const peers = groups.get(`${d.unit_id}|${d.grupo}`)!;
-    const q = sum(peers, (p) => Math.max(0, p.qtd));
+    const exposure = (p: DishRow) =>
+      p.disponibilidade_conhecida === true &&
+      p.dias_disponiveis != null &&
+      p.dias_disponiveis > 0
+        ? Math.max(0, p.qtd_disponivel ?? 0) / p.dias_disponiveis
+        : null;
+    const availabilityKnown = peers.every((p) => exposure(p) !== null);
+    const q = sum(peers, (p) => exposure(p) ?? 0);
     const costed = peers.filter((p) => p.custo_unitario !== null && p.qtd > 0);
     const price = ratio(d.receita, d.qtd),
       margin =
@@ -250,7 +267,7 @@ export function menuEngineering(rows: DishRow[]) {
       sum(costed, (p) => p.receita - p.qtd * p.custo_unitario!),
       sum(costed, (p) => p.qtd),
     );
-    const popularity = ratio(d.qtd, q);
+    const popularity = availabilityKnown ? ratio(exposure(d) ?? 0, q) : null;
     const cutoff = 0.7 / peers.length;
     const kind =
       margin === null || avg === null || popularity === null
@@ -273,6 +290,9 @@ export function menuEngineering(rows: DishRow[]) {
           ? (d.custo_unitario / price) * 100
           : null,
       kind,
+      conflict:
+        d.papel === "assinatura" &&
+        (kind === "Cão" || kind === "Burro de carga"),
       popularity,
       cutoff,
       averageMargin: avg,
@@ -608,7 +628,13 @@ export function buildCockpit(input: CockpitInput) {
     })),
     inventory: input.months
       .filter((r) => months.includes(r.mes))
-      .map((r) => ({ unitId: r.unit_id, month: r.mes, method: r.metodo, initial: r.estoque_inicial_rs, final: r.estoque_final_rs })),
+      .map((r) => ({
+        unitId: r.unit_id,
+        month: r.mes,
+        method: r.metodo,
+        initial: r.estoque_inicial_rs,
+        final: r.estoque_final_rs,
+      })),
     decisions: input.analysis.suppliers
       .filter((s) => s.overpaid > 0)
       .sort((a, b) => b.overpaid - a.overpaid)

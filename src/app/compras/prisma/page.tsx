@@ -10,7 +10,12 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 export default async function PrismaPage() {
   const { units, months } = await getCompleteMonths();
-  const defaultUnit = months.all ? null : units.find(u=>months[u.id])?.id ?? null;
+  const defaultUnit = months.all
+    ? null
+    : ((
+        units.find((u) => u.name === "Meet & Eat" && months[u.id]) ??
+        units.find((u) => months[u.id])
+      )?.id ?? null);
   const end = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
@@ -19,7 +24,12 @@ export default async function PrismaPage() {
   }).format(new Date());
   return (
     <div className={`${serif.variable} ${sans.variable}`}>
-      <CockpitClient units={units} initialMonth={months[defaultUnit ?? "all"] ?? shiftMonth(end, -1)} initialUnit={defaultUnit} completeMonths={months} />
+      <CockpitClient
+        units={units}
+        initialMonth={months[defaultUnit ?? "all"] ?? shiftMonth(end, -1)}
+        initialUnit={defaultUnit}
+        completeMonths={months}
+      />
     </div>
   );
 }

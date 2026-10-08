@@ -30,7 +30,11 @@ async function readRows<T>(
   for (let offset = 0; ; offset += 1000) {
     let q = db.from(table).select("*").in("unit_id", unitIds).order("unit_id");
     if (start) q = q.gte("mes", start).lte("mes", end!).order("mes");
-    if (table === "mv_prisma_prato_mes") q = q.order("nome_venda");
+    if (
+      table === "mv_prisma_prato_mes" ||
+      table === "v_abastecimento_engenharia"
+    )
+      q = q.order("nome_venda");
     if (table === "mv_prisma_compra_mes")
       q = q.order("item_id").order("raiz_cnpj");
     if (table === "mv_fornecedor_ancora") q = q.order("raiz_cnpj");
@@ -68,6 +72,9 @@ export async function getCockpit(raw: CockpitFilter) {
     completeness,
     inventory,
     missingStock,
+    availability,
+    roles,
+    supplyAlerts,
   ] = await Promise.all([
     readRows<MonthRow>(
       db,
@@ -126,12 +133,78 @@ export async function getCockpit(raw: CockpitFilter) {
       `${f.month.slice(0, 4)}-01-01`,
       f.month,
     ),
-    readRows<{unit_id:string;mes:string;notas_incompletas:boolean|null;receita_parcial:boolean|null;pct_completo:number|null}>(db,"v_prisma_completude_mes",unitIds,shiftMonth(f.month,-12),f.month),
-    db.from("v_prisma_estoque_fechamento").select("*").in("unit_id",unitIds).gte("dia",shiftMonth(f.month,-1)).lte("dia",monthEnd(f.month)),
-    db.from("v_prisma_estoque_item").select("unit_id,dia,deposito,descricao_item,unidade_medida,quantidade,fonte_custo").in("unit_id",unitIds).gte("dia",shiftMonth(f.month,-1)).lte("dia",monthEnd(f.month)).gt("quantidade",0).is("custo_unitario",null).order("dia").order("descricao_item").limit(500),
+    readRows<{
+      unit_id: string;
+      mes: string;
+      notas_incompletas: boolean | null;
+      receita_parcial: boolean | null;
+      pct_completo: number | null;
+    }>(
+      db,
+      "v_prisma_completude_mes",
+      unitIds,
+      shiftMonth(f.month, -12),
+      f.month,
+    ),
+    db
+      .from("v_prisma_estoque_fechamento")
+      .select("*")
+      .in("unit_id", unitIds)
+      .gte("dia", shiftMonth(f.month, -1))
+      .lte("dia", monthEnd(f.month)),
+    db
+      .from("v_prisma_estoque_item")
+      .select(
+        "unit_id,dia,deposito,descricao_item,unidade_medida,quantidade,fonte_custo",
+      )
+      .in("unit_id", unitIds)
+      .gte("dia", shiftMonth(f.month, -1))
+      .lte("dia", monthEnd(f.month))
+      .gt("quantidade", 0)
+      .is("custo_unitario", null)
+      .order("dia")
+      .order("descricao_item")
+      .limit(500),
+    readRows<{
+      unit_id: string;
+      mes: string;
+      nome_venda: string;
+      dias_disponiveis: number;
+      qtd_disponivel: number;
+      disponibilidade_conhecida: boolean;
+    }>(
+      db,
+      "v_abastecimento_engenharia",
+      unitIds,
+      shiftMonth(f.month, -12),
+      f.month,
+    ),
+    db
+      .from("cardapio_papel")
+      .select(
+        "produto_venda_ficha_id,papel,produto_venda_ficha(nome_venda,unit_id)",
+      )
+      .in("unit_id", unitIds),
+    readRows<AlertRow>(db, "v_abastecimento_alertas", unitIds),
   ]);
-  if(inventory.error || missingStock.error) throw new Error(inventory.error?.message ?? missingStock.error?.message);
-  const quality = new Map(completeness.map(r=>[`${r.unit_id}|${r.mes}`,r]));
+  if (roles.error) throw new Error(roles.error.message);
+  const exposures = new Map(
+    availability.map((r) => [`${r.unit_id}|${r.mes}|${r.nome_venda}`, r]),
+  );
+  const brandRoles = new Map(
+    (roles.data ?? []).map((r) => {
+      const b = r.produto_venda_ficha as unknown as {
+        unit_id: string;
+        nome_venda: string;
+      };
+      return [`${b.unit_id}|${b.nome_venda}`, r.papel];
+    }),
+  );
+  if (inventory.error || missingStock.error)
+    throw new Error(inventory.error?.message ?? missingStock.error?.message);
+  const quality = new Map(
+    completeness.map((r) => [`${r.unit_id}|${r.mes}`, r]),
+  );
   if (names.error || refresh.error)
     throw new Error(names.error?.message ?? refresh.error?.message);
   const aliases = Object.fromEntries(
@@ -149,12 +222,22 @@ export async function getCockpit(raw: CockpitFilter) {
     month: f.month,
     comparison: f.comparison,
     units: visibleUnits,
-    months: months.map(r=>({...r,...quality.get(`${r.unit_id}|${r.mes}`)})),
-    dishes,
+    months: months.map((r) => ({
+      ...r,
+      ...quality.get(`${r.unit_id}|${r.mes}`),
+    })),
+    dishes: dishes.map((d) => ({
+      ...d,
+      ...exposures.get(`${d.unit_id}|${d.mes}|${d.nome_venda}`),
+      disponibilidade_conhecida:
+        exposures.get(`${d.unit_id}|${d.mes}|${d.nome_venda}`)
+          ?.disponibilidade_conhecida ?? false,
+      papel: brandRoles.get(`${d.unit_id}|${d.nome_venda}`) ?? null,
+    })),
     purchases,
     captures: plan.rows,
     ownerTargets,
-    alerts,
+    alerts: [...alerts, ...supplyAlerts],
     analysis: cleanAnalysis,
     aliases,
     anchors,
@@ -174,7 +257,11 @@ export async function getCockpit(raw: CockpitFilter) {
     outra_unit_id:
       a.outra_unit_id && allowed.has(a.outra_unit_id) ? a.outra_unit_id : null,
   }));
-  return {...result, stockClosings: inventory.data ?? [], stockMissing: missingStock.data ?? []};
+  return {
+    ...result,
+    stockClosings: inventory.data ?? [],
+    stockMissing: missingStock.data ?? [],
+  };
 }
 export async function saveCockpitTarget(raw: {
   unitId: string;
@@ -318,12 +405,47 @@ export async function addMenuPlan(raw: {
 }
 
 export async function getCompleteMonths() {
- const {db,units,unitIds}=await comprasAccess();
- const today=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
- const end=shiftMonth(today,-1);
- const rows=await readRows<{unit_id:string;mes:string;notas_incompletas:boolean|null;receita_parcial:boolean|null}>(db,"v_prisma_completude_mes",unitIds,shiftMonth(end,-23),end);
- const map:Record<string,string|null>={};
- for(const u of units)map[u.id]=rows.filter(r=>r.unit_id===u.id&&r.notas_incompletas===false&&r.receita_parcial===false).map(r=>r.mes).sort().at(-1)??null;
- map.all=[...new Set(rows.map(r=>r.mes))].filter(m=>unitIds.every(id=>rows.some(r=>r.unit_id===id&&r.mes===m&&r.notas_incompletas===false&&r.receita_parcial===false))).sort().at(-1)??null;
- return {units,months:map,fallback:end};
+  const { db, units, unitIds } = await comprasAccess();
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const end = shiftMonth(today, -1);
+  const rows = await readRows<{
+    unit_id: string;
+    mes: string;
+    notas_incompletas: boolean | null;
+    receita_parcial: boolean | null;
+  }>(db, "v_prisma_completude_mes", unitIds, shiftMonth(end, -23), end);
+  const map: Record<string, string | null> = {};
+  for (const u of units)
+    map[u.id] =
+      rows
+        .filter(
+          (r) =>
+            r.unit_id === u.id &&
+            r.notas_incompletas === false &&
+            r.receita_parcial === false,
+        )
+        .map((r) => r.mes)
+        .sort()
+        .at(-1) ?? null;
+  map.all =
+    [...new Set(rows.map((r) => r.mes))]
+      .filter((m) =>
+        unitIds.every((id) =>
+          rows.some(
+            (r) =>
+              r.unit_id === id &&
+              r.mes === m &&
+              r.notas_incompletas === false &&
+              r.receita_parcial === false,
+          ),
+        ),
+      )
+      .sort()
+      .at(-1) ?? null;
+  return { units, months: map, fallback: end };
 }
