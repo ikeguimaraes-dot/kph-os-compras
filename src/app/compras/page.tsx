@@ -64,6 +64,7 @@ export default async function ComprasPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <a href="/compras/prisma" className={buttonVariants({ variant: "outline" })}>Prisma de Compras</a>
           <Link
             href="/compras/fornecedores"
             className={buttonVariants({ variant: "outline" })}

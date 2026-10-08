@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies, headers } from "next/headers";
 import type { Database } from "../types/database";
+import { sessionCookies } from "./session-cookies";
 
 /**
  * Cliente Supabase para Server Components / Server Actions / Route Handlers.
@@ -12,17 +13,13 @@ import type { Database } from "../types/database";
  * tratamos a exceção silenciosamente.
  */
 export async function createSupabaseServerClient(
-  resolvedCookieStore?: Awaited<ReturnType<typeof cookies>>
+  resolvedCookieStore?: Awaited<ReturnType<typeof cookies>>,
 ): Promise<SupabaseClient<Database> | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) return null;
 
   const cookieStore = resolvedCookieStore ?? (await cookies());
-
-  // AUTH DESATIVADO: sem sessão → service role para bypassar RLS
-  const hasSession = cookieStore.getAll().some((c) => c.name.includes("auth-token"));
-  if (!hasSession) return createServiceClient();
 
   // Aplica o Set-Cookie do middleware se a request foi um Server Action
   // (Next.js 14+ tem bug que dropa Set-Cookie de middleware em Server Actions)
@@ -40,20 +37,18 @@ export async function createSupabaseServerClient(
   }
 
   return createServerClient<Database>(url, anonKey, {
+    cookieOptions: {
+      name: `sb-${new URL(url).hostname.split(".")[0]}-auth-token`,
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
     cookies: {
       getAll() {
-        return cookieStore.getAll();
+        return sessionCookies(cookieStore.getAll(), url);
       },
-      setAll(cookiesToSet) {
-        try {
-          for (const { name, value, options } of cookiesToSet) {
-            cookieStore.set(name, value, options);
-          }
-        } catch {
-          // Server Component: cookies não podem ser escritos. proxy.ts
-          // cuida do refresh. Ignorar é seguro.
-        }
-      },
+      // O shell mantém e renova a sessão compartilhada. A zona só a valida.
+      setAll() {},
     },
   });
 }

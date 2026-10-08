@@ -11,3 +11,12 @@ tsconfig.tsbuildinfo
 *.pem
 npm-debug.log*
 .vercel/
+.vercel
+.env*
+
+# Private purchasing context and exported business data (this repository is public).
+/docs/CONTEXTO.md
+/docs/PRISMA-BOOK.md
+/docs/PRISMA-VALIDACAO.md
+/docs/prisma-prototipo.html
+/docs/fila-ponte-prioritaria.csv

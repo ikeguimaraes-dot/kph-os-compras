@@ -37,7 +37,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       error: authError,
     } = await supabase.auth.getUser();
     if (authError) {
-      console.warn("[getCurrentUser] auth.getSession error:", authError.message);
+      console.warn("[getCurrentUser] auth.getUser error:", authError.message, authError.code, authError.status);
       return null;
     }
     if (!user) return null;
