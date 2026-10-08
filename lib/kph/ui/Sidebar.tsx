@@ -526,7 +526,7 @@ export function Sidebar(_props?: {
             </div>
             <div style={{ fontSize: 10, color: "var(--text-3)" }}>{role}</div>
           </div>
-          <Link
+          <a
             href="/auth/sign-out"
             title="Sair"
             style={{
@@ -537,7 +537,7 @@ export function Sidebar(_props?: {
             }}
           >
             <LogOut size={14} />
-          </Link>
+          </a>
         </div>
       </aside>
     </>
