@@ -27,3 +27,20 @@ O banco é compartilhado. A consolidação não executa DDL nem reaplica migrati
 | 20261008151012 | prisma_metas_responsavel | Compras |
 
 Relatórios privados de validação permanecem locais em docs/ do Compras, ignorados pelo Git porque o repositório é público. Não publicar exportações financeiras, prints ou estratégia confidencial.
+
+## Qualidade e abastecimento
+
+Compras mantém `v_prisma_completude_mes`, `v_prisma_estoque_*`, aliases de fornecedores, `abastecimento_*`, `v_abastecimento_*`, `cardapio_papel`, `cardapio_retirada_aprovacao`, `compras_matriz_marcas` e `compras_cotacao_distribuidor`.
+
+`op_86`, relatórios da operação e ingestões Everest/Lorean são somente fontes de leitura. As causas confirmadas, os planos de retorno, as propostas e as aprovações ficam em tabelas próprias. Nenhum acordo executa pagamento ou baixa de título; a conciliação efetiva continua no Everest. As ações do servidor conferem identidade, papel e escopo de casa antes de usar o cliente de serviço. As tabelas novas não concedem acesso direto a anon/authenticated.
+
+As versões posteriores à consolidação são alterações novas, aplicadas uma vez:
+
+| Versão | Migration |
+| --- | --- |
+| 20261008181217 | prisma_completude_estoque_apelidos |
+| 20261008182307 | prisma_abastecimento_core |
+| 20261008182328 | prisma_abastecimento_models |
+| 20261008182834 | prisma_abastecimento_sugestoes_recentes |
+| 20261008183118 | prisma_abastecimento_guardas_alertas |
+| 20261008183558 | prisma_abastecimento_metas_retomada |
