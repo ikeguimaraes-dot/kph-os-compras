@@ -774,7 +774,7 @@ export default function CockpitClient({
                 <div className="cockpit-empty">
                   Não há receita e fichas com custo nos dois períodos para
                   atribuir a variação.{" "}
-                  <a href="/financeiro/dre/cmv/ponte">Revisar a ponte →</a>
+                  <a href="/compras/fichas">Revisar a ponte →</a>
                 </div>
               )}
               <Formula>
@@ -880,7 +880,7 @@ export default function CockpitClient({
                           {d.kind ? (
                             <span className="prisma-tag">{d.kind}</span>
                           ) : (
-                            <a href="/financeiro/dre/cmv/ponte">
+                            <a href="/compras/fichas">
                               {d.status_ponte === "confirmado"
                                 ? "Custo incompleto no mês"
                                 : "Sem ficha confirmada"}{" "}

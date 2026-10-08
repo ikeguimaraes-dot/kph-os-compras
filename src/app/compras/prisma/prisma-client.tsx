@@ -597,7 +597,7 @@ export default function PrismaClient({
                     </div>
                     <a
                       className="prisma-link"
-                      href="https://kph-os-financeiro.vercel.app/financeiro/dre/cmv/ponte"
+                      href="https://kph-os-financeiro.vercel.app/compras/fichas"
                       target="_blank"
                       rel="noreferrer"
                     >
