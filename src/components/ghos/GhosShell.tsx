@@ -142,12 +142,12 @@ function Shell({ children }: { children: React.ReactNode }) {
         <Link
           href="/compras/inicio"
           className="ghos-brand"
-          aria-label="GHOS — início"
+          aria-label="GHOST — início"
           onClick={() => drawer.current?.close()}
         >
           <GhosMark />
           <span>
-            ghos<small>COMPRAS · GRUPO KPH</small>
+            ghost<small>COMPRAS · GRUPO KPH</small>
           </span>
         </Link>
         {mobile && (
@@ -233,7 +233,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <dialog
         ref={drawer}
         className="ghos-mobile-menu"
-        aria-label="Menu GHOS"
+        aria-label="Menu GHOST"
         onClick={(event) => {
           if (event.target === event.currentTarget) drawer.current?.close();
         }}
@@ -250,7 +250,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Menu size={21} />
           </button>
           <nav aria-label="Localização">
-            <Link href="/compras/inicio">GHOS</Link>
+            <Link href="/compras/inicio">GHOST</Link>
             <span>/</span>
             <strong>{label}</strong>
           </nav>
