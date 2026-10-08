@@ -1,5 +1,8 @@
 export const PRISMA = {
   pareto: 0.8,
+  alertPricePremium: 0.08,
+  alertInvoiceMultiple: 2,
+  alertUnmappedRevenue: 5000,
   priceRatioLimit: 2.5,
   packagingWarningRatio: 1.5,
   highRisk: 0.35,

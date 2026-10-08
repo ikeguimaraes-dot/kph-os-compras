@@ -32,6 +32,7 @@ export type Plan = {
   prazo: string | null;
   status: "aberta" | "em negociação" | "capturada" | "descartada";
   capturado_rs: number;
+  capturado_em: string | null;
   criado_por: string;
   criado_em: string;
   atualizado_em: string;
@@ -138,8 +139,24 @@ const cachedAnalysis = unstable_cache(loadAnalysis, ["prisma-v1"], {
 });
 export async function getPrisma(raw: PrismaFilter) {
   const filter = filterSchema.parse(raw);
-  const { unitIds } = await comprasAccess(filter.unitId);
-  return cachedAnalysis(unitIds.sort(), filter.start, filter.end);
+  const { db, unitIds } = await comprasAccess(filter.unitId);
+  const data = await cachedAnalysis(unitIds.sort(), filter.start, filter.end);
+  const aliases = await db
+    .from("compras_fornecedor_apelido")
+    .select("raiz_cnpj,apelido")
+    .limit(5000);
+  if (aliases.error) throw new Error(aliases.error.message);
+  const names = new Map(
+    (aliases.data ?? []).map((r) => [r.raiz_cnpj, r.apelido]),
+  );
+  return {
+    ...data,
+    suppliers: data.suppliers.map((s) => ({
+      ...s,
+      name: names.get(s.root) ?? s.name,
+    })),
+    pairs: data.pairs.map((p) => ({ ...p, name: names.get(p.root) ?? p.name })),
+  };
 }
 export async function getPrismaAnchors(unitId: string | null) {
   const { db, unitIds, units } = await comprasAccess(unitId);
@@ -233,6 +250,7 @@ export async function updatePrismaPlan(raw: {
   prazo: string | null;
   status: Plan["status"];
   capturado_rs: number;
+  capturado_em: string | null;
 }) {
   const v = z
     .object({
@@ -242,8 +260,11 @@ export async function updatePrismaPlan(raw: {
       prazo: date.nullable(),
       status: z.enum(["aberta", "em negociação", "capturada", "descartada"]),
       capturado_rs: z.number().finite().min(0).max(999999999999),
+      capturado_em: date.nullable(),
     })
     .parse(raw);
+  if (v.status === "capturada" && !v.capturado_em)
+    throw new Error("Informe a data efetiva da economia capturada.");
   const { db, unitIds } = await comprasAccess();
   const { data: row, error } = await db
     .from("compras_plano_acao")
@@ -260,6 +281,7 @@ export async function updatePrismaPlan(raw: {
       prazo: v.prazo,
       status: v.status,
       capturado_rs: v.capturado_rs,
+      capturado_em: v.capturado_em,
       atualizado_em: new Date().toISOString(),
     })
     .eq("id", v.id)

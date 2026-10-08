@@ -1,4 +1,5 @@
 "use client";
+import { saveSupplierAlias } from "@/lib/compras/prisma-cockpit-actions";
 import { useEffect, useRef, useState } from "react";
 import {
   getPrisma,
@@ -47,18 +48,26 @@ export default function PrismaClient({
   units,
   initialStart,
   initialEnd,
+  initialTab = 0,
+  initialUnitId = null,
+  initialRoot,
+  canEditNames = false,
 }: {
   units: { id: string; name: string }[];
   initialStart: string;
   initialEnd: string;
+  initialTab?: number;
+  initialUnitId?: string | null;
+  initialRoot?: string;
+  canEditNames?: boolean;
 }) {
   const [filter, setFilter] = useState<PrismaFilter>({
-    unitId: null,
+    unitId: initialUnitId,
     start: initialStart,
     end: initialEnd,
   });
   const [draft, setDraft] = useState(filter),
-    [tab, setTab] = useState(0),
+    [tab, setTab] = useState(initialTab),
     [data, setData] = useState<PrismaAnalysis | null>(null);
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -70,10 +79,13 @@ export default function PrismaClient({
   const [anchorLoading, setAnchorLoading] = useState(false),
     [search, setSearch] = useState(""),
     [quadrant, setQuadrant] = useState("Todos");
-  const [drawer, setDrawer] = useState<Drawer | null>(null),
+  const [drawer, setDrawer] = useState<Drawer | null>(
+      initialRoot ? { kind: "supplier", root: initialRoot } : null,
+    ),
     [migration, setMigration] = useState(25),
     [refresh, setRefresh] = useState(0);
   const modal = useRef<HTMLDialogElement>(null);
+  const pendingRoot = useRef(initialRoot);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -88,6 +100,10 @@ export default function PrismaClient({
           setData(d);
           setPlan(p.rows);
           setCanGroup(p.canGroup);
+          if (pendingRoot.current) {
+            setDrawer({ kind: "supplier", root: pendingRoot.current });
+            pendingRoot.current = undefined;
+          }
         }
       })
       .catch((e) => {
@@ -149,6 +165,7 @@ export default function PrismaClient({
         prazo: p.prazo,
         status: p.status,
         capturado_rs: Number(p.capturado_rs),
+        capturado_em: p.capturado_em,
       });
       setPlan((await listPrismaPlan(filter.unitId)).rows);
       setNotice("Ação atualizada no banco.");
@@ -197,7 +214,7 @@ export default function PrismaClient({
       <nav className="prisma-breadcrumb" aria-label="Navegação de compras">
         <a href="/compras">Compras</a>
         <span>/</span>
-        <span>Prisma</span>
+        <a href="/compras/prisma">Cockpit de margem</a>
         <a href="/compras/recebimento">Conferir notas ↗</a>
       </nav>
       <header className="prisma-hero">
@@ -727,6 +744,41 @@ export default function PrismaClient({
               </h2>
               {selectedSupplier && (
                 <>
+                  {canEditNames && (
+                    <form
+                      key={selectedSupplier.root}
+                      className="prisma-filters"
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        const form = new FormData(e.currentTarget);
+                        setBusy(true);
+                        try {
+                          await saveSupplierAlias({
+                            root: selectedSupplier.root,
+                            name: String(form.get("apelido")),
+                            unitId: filter.unitId,
+                          });
+                          setRefresh((n) => n + 1);
+                          setNotice("Apelido atualizado.");
+                        } catch (e) {
+                          setError(message(e));
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      <label>
+                        Nome usado pelo time
+                        <input
+                          name="apelido"
+                          required
+                          maxLength={120}
+                          defaultValue={selectedSupplier.name}
+                        />
+                      </label>
+                      <button disabled={busy}>Salvar apelido</button>
+                    </form>
+                  )}
                   <p>
                     {selectedSupplier.quadrant} · nota{" "}
                     {selectedSupplier.score ?? "—"} ·{" "}
@@ -1010,6 +1062,17 @@ function PlanCard({
             value={p.capturado_rs}
             onChange={(e) =>
               setP({ ...p, capturado_rs: Number(e.target.value) })
+            }
+          />
+        </label>
+        <label>
+          Data da captura
+          <input
+            type="date"
+            required={p.status === "capturada"}
+            value={p.capturado_em ?? ""}
+            onChange={(e) =>
+              setP({ ...p, capturado_em: e.target.value || null })
             }
           />
         </label>
