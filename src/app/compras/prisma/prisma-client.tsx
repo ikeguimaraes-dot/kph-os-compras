@@ -29,7 +29,9 @@ const inf = (n: number | null) =>
 const dateBR = (v: string) => v.split("-").reverse().join("/");
 const message = (e: unknown) =>
   e instanceof Error
-    ? e.message
+    ? /server action|failed to find|unexpected response/i.test(e.message)
+      ? "A conexão desta tela foi atualizada. Recarregue para buscar os dados."
+      : e.message
     : "Não foi possível concluir. Tente novamente.";
 type Anchors = Awaited<ReturnType<typeof getPrismaAnchors>>;
 type Drawer =
@@ -263,7 +265,7 @@ export default function PrismaClient({
       {error && (
         <div className="prisma-alert" role="alert">
           {error}{" "}
-          <button onClick={() => setRefresh((n) => n + 1)}>Recarregar</button>
+          <button onClick={() => window.location.reload()}>Recarregar</button>
         </div>
       )}
       {notice && (
