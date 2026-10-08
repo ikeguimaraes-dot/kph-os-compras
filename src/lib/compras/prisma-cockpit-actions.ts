@@ -65,6 +65,9 @@ export async function getCockpit(raw: CockpitFilter) {
     anchors,
     refresh,
     ownerTargets,
+    completeness,
+    inventory,
+    missingStock,
   ] = await Promise.all([
     readRows<MonthRow>(
       db,
@@ -123,7 +126,12 @@ export async function getCockpit(raw: CockpitFilter) {
       `${f.month.slice(0, 4)}-01-01`,
       f.month,
     ),
+    readRows<{unit_id:string;mes:string;notas_incompletas:boolean|null;receita_parcial:boolean|null;pct_completo:number|null}>(db,"v_prisma_completude_mes",unitIds,shiftMonth(f.month,-12),f.month),
+    db.from("v_prisma_estoque_fechamento").select("*").in("unit_id",unitIds).gte("dia",shiftMonth(f.month,-1)).lte("dia",monthEnd(f.month)),
+    db.from("v_prisma_estoque_item").select("unit_id,dia,deposito,descricao_item,unidade_medida,quantidade,fonte_custo").in("unit_id",unitIds).gte("dia",shiftMonth(f.month,-1)).lte("dia",monthEnd(f.month)).gt("quantidade",0).is("custo_unitario",null).order("dia").order("descricao_item").limit(500),
   ]);
+  if(inventory.error || missingStock.error) throw new Error(inventory.error?.message ?? missingStock.error?.message);
+  const quality = new Map(completeness.map(r=>[`${r.unit_id}|${r.mes}`,r]));
   if (names.error || refresh.error)
     throw new Error(names.error?.message ?? refresh.error?.message);
   const aliases = Object.fromEntries(
@@ -141,7 +149,7 @@ export async function getCockpit(raw: CockpitFilter) {
     month: f.month,
     comparison: f.comparison,
     units: visibleUnits,
-    months,
+    months: months.map(r=>({...r,...quality.get(`${r.unit_id}|${r.mes}`)})),
     dishes,
     purchases,
     captures: plan.rows,
@@ -166,7 +174,7 @@ export async function getCockpit(raw: CockpitFilter) {
     outra_unit_id:
       a.outra_unit_id && allowed.has(a.outra_unit_id) ? a.outra_unit_id : null,
   }));
-  return result;
+  return {...result, stockClosings: inventory.data ?? [], stockMissing: missingStock.data ?? []};
 }
 export async function saveCockpitTarget(raw: {
   unitId: string;
@@ -267,6 +275,7 @@ export async function saveSupplierAlias(raw: {
   const { error } = await db.from("compras_fornecedor_apelido").upsert({
     raiz_cnpj: v.root,
     apelido: v.name,
+    origem: "manual",
     atualizado_por: user.id,
     atualizado_em: new Date().toISOString(),
   });
@@ -306,4 +315,15 @@ export async function addMenuPlan(raw: {
     { onConflict: "unit_id,tipo,alvo", ignoreDuplicates: true },
   );
   if (error) throw new Error(error.message);
+}
+
+export async function getCompleteMonths() {
+ const {db,units,unitIds}=await comprasAccess();
+ const today=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+ const end=shiftMonth(today,-1);
+ const rows=await readRows<{unit_id:string;mes:string;notas_incompletas:boolean|null;receita_parcial:boolean|null}>(db,"v_prisma_completude_mes",unitIds,shiftMonth(end,-23),end);
+ const map:Record<string,string|null>={};
+ for(const u of units)map[u.id]=rows.filter(r=>r.unit_id===u.id&&r.notas_incompletas===false&&r.receita_parcial===false).map(r=>r.mes).sort().at(-1)??null;
+ map.all=[...new Set(rows.map(r=>r.mes))].filter(m=>unitIds.every(id=>rows.some(r=>r.unit_id===id&&r.mes===m&&r.notas_incompletas===false&&r.receita_parcial===false))).sort().at(-1)??null;
+ return {units,months:map,fallback:end};
 }

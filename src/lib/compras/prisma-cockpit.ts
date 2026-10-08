@@ -12,6 +12,11 @@ export type MonthRow = {
   metodo: string;
   cmv_meta_pct: number | null;
   economia_meta_rs: number | null;
+  notas_incompletas?: boolean | null;
+  receita_parcial?: boolean | null;
+  pct_completo?: number | null;
+  estoque_inicial_rs?: number | null;
+  estoque_final_rs?: number | null;
 };
 export type DishRow = {
   unit_id: string;
@@ -114,7 +119,10 @@ export function monthly(rows: MonthRow[]) {
   const revenue = sum(rows, (r) => r.receita),
     cost = sum(rows, (r) => r.cmv_real_rs),
     covered = sum(rows, (r) => r.receita_coberta);
-  const real = ratio(cost, revenue),
+  const incomplete = rows.some(r => r.notas_incompletas === true);
+  const partialRevenue = rows.some(r => r.receita_parcial === true || (r.receita <= 0 && r.comprado_rs > 0));
+  const unverified = rows.some(r => r.notas_incompletas === null || r.receita_parcial === null);
+  const real = partialRevenue ? null : ratio(cost, revenue),
     theory = ratio(
       sum(rows, (r) => r.custo_teorico_rs ?? 0),
       covered,
@@ -125,6 +133,7 @@ export function monthly(rows: MonthRow[]) {
       ? sum(withRevenue, (r) => r.receita * r.cmv_meta_pct!) / revenue
       : null;
   return {
+    incomplete, partialRevenue, unverified,
     revenue,
     cost,
     covered,
@@ -446,8 +455,8 @@ export function buildCockpit(input: CockpitInput) {
   const wf = waterfall(
     dishes,
     priorDishes,
-    current.real,
-    previous.real,
+    current.incomplete || current.unverified ? null : current.real,
+    previous.incomplete || previous.unverified ? null : previous.real,
     capturedMonth,
     current.revenue,
   );
@@ -599,7 +608,7 @@ export function buildCockpit(input: CockpitInput) {
     })),
     inventory: input.months
       .filter((r) => months.includes(r.mes))
-      .map((r) => ({ unitId: r.unit_id, month: r.mes, method: r.metodo })),
+      .map((r) => ({ unitId: r.unit_id, month: r.mes, method: r.metodo, initial: r.estoque_inicial_rs, final: r.estoque_final_rs })),
     decisions: input.analysis.suppliers
       .filter((s) => s.overpaid > 0)
       .sort((a, b) => b.overpaid - a.overpaid)

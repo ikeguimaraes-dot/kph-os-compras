@@ -312,17 +312,21 @@ function Waterfall({
 export default function CockpitClient({
   units,
   initialMonth,
+  completeMonths,
+  initialUnit,
 }: {
   units: { id: string; name: string }[];
   initialMonth: string;
+  initialUnit: string | null;
+  completeMonths: Record<string,string|null>;
 }) {
   const [filter, setFilter] = useState<CockpitFilter>({
-      unitId: null,
+      unitId: initialUnit,
       month: initialMonth,
       comparison: "previous",
     }),
     [draft, setDraft] = useState(filter);
-  const [data, setData] = useState<Cockpit | null>(null),
+  const [data, setData] = useState<Awaited<ReturnType<typeof getCockpit>> | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -379,7 +383,7 @@ export default function CockpitClient({
     }
   }
   const delta =
-    data?.current.real != null && data.previous.real != null
+    data?.current.real != null && data.previous.real != null && !data.current.incomplete && !data.previous.incomplete && !data.current.unverified && !data.previous.unverified
       ? data.current.real - data.previous.real
       : null;
   const strongest = data?.waterfall?.bars
@@ -447,7 +451,7 @@ export default function CockpitClient({
           <select
             value={draft.unitId ?? ""}
             onChange={(e) =>
-              setDraft({ ...draft, unitId: e.target.value || null })
+              setDraft({ ...draft, unitId: e.target.value || null, month: completeMonths[e.target.value || "all"] ?? draft.month })
             }
           >
             <option value="">Todas as casas autorizadas</option>
@@ -510,10 +514,11 @@ export default function CockpitClient({
               {label(data.month)} versus {label(data.compare)} · tendência de 12
               meses · valores sem gorjeta
             </p>
+            {(data.current.incomplete || data.current.partialRevenue || data.current.unverified) && <div className="prisma-alert" role="status"><strong>{data.current.incomplete ? "Notas incompletas. " : ""}{data.current.partialRevenue ? "Receita parcial. " : ""}{data.current.unverified ? "Histórico insuficiente para validar todas as casas. " : ""}</strong>Compras, custos, inflação e comparações são provisórios. A queda do CMV não comprova economia.</div>}
             <div className="cockpit-metrics">
               <Metric
                 name="CMV real"
-                value={pct(data.current.real)}
+                value={data.current.partialRevenue ? "Receita parcial" : pct(data.current.real)}
                 detail={
                   <>
                     {pp(delta)} ·{" "}
@@ -526,7 +531,7 @@ export default function CockpitClient({
                   </>
                 }
                 story={
-                  delta === null
+                  data.current.incomplete ? "Notas incompletas: aguardar conciliação antes de interpretar melhora de margem." : data.current.partialRevenue ? "Receita parcial: o percentual está suspenso até validar a base." : data.current.unverified ? "Histórico insuficiente: a comparação ainda precisa de validação." : delta === null
                     ? "Receita ou comparação insuficiente para medir a variação."
                     : `CMV ${delta > 0 ? "subiu" : delta < 0 ? "caiu" : "ficou estável"} ${num(Math.abs(delta))} p.p..${strongest ? ` Maior componente: ${strongest.label.toLowerCase()}.` : " Sem fichas comparáveis para atribuir a causa."}`
                 }
@@ -669,7 +674,7 @@ export default function CockpitClient({
                           <tbody>
                             {u.months.map((m) => (
                               <tr key={m.month}>
-                                <th>{label(m.month)}</th>
+                                <th>{label(m.month)}<small>{m.incomplete ? " · notas incompletas" : ""}{m.partialRevenue ? " · receita parcial" : ""}{m.unverified ? " · a validar" : ""}</small></th>
                                 <td>{pct(m.real)}</td>
                                 <td>{pct(m.theory)}</td>
                                 <td>
@@ -694,6 +699,7 @@ export default function CockpitClient({
                   </section>
                 ))}
               </div>
+              <details className="cockpit-panel"><summary>Inventário: valores e itens sem custo</summary><p>Valoramos pela casa e mês da contagem. Sem referência de valor para um item, a cobertura financeira fica desconhecida e o mês permanece proxy.</p><div className="prisma-table-wrap"><table><thead><tr><th>Casa / data</th><th>Estoque valorado</th><th>Itens positivos sem custo</th><th>Valor coberto</th></tr></thead><tbody>{data.stockClosings.map((r)=><tr key={`${r.unit_id}|${r.dia}`}><th>{house(r.unit_id)} · {r.dia}</th><td>{money(Number(r.estoque_rs))}</td><td>{r.itens_sem_custo}/{r.itens_positivos}</td><td>{r.pct_valorado==null?"Desconhecido":pct(Number(r.pct_valorado)*100)}</td></tr>)}</tbody></table></div><ul>{data.stockMissing.map((r,i)=><li key={i}>{house(r.unit_id)} · {r.dia} · {r.deposito}: {r.descricao_item} — {num(Number(r.quantidade))} {r.unidade_medida} · sem custo</li>)}</ul>{data.stockMissing.length===500&&<p>Exibindo os primeiros 500 itens sem custo.</p>}</details>
               {data.canEdit && (
                 <details className="cockpit-panel">
                   <summary>Editar meta de uma casa</summary>
