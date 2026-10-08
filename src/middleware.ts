@@ -9,7 +9,9 @@ export function middleware(request: NextRequest) {
   if (!localEntry && entryHost && entryHost !== shellHost) {
     return NextResponse.redirect(new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, shellUrl), 302);
   }
-  return NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-kph-compras-path", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = { matcher: ["/compras/:path*"] };

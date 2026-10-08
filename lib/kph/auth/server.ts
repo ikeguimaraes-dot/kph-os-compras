@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
 import type { RoleName } from "@kph/db/types/database";
 
@@ -30,8 +30,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       return null;
     }
 
-    // getSession() lê o JWT do cookie localmente (sem chamada de rede).
-    // O middleware já validou o token com getUser() — aqui confiamos nele.
+    // A zona valida a sessão no Auth, mesmo quando o shell já a reconheceu.
     const {
       data: { user },
       error: authError,
@@ -106,7 +105,12 @@ export async function requireUser(): Promise<CurrentUser> {
   if (user) return user;
   const shell = process.env.NEXT_PUBLIC_SHELL_URL?.replace(/\/$/, "") ??
     (process.env.NODE_ENV === "development" ? "http://localhost:3000" : "https://kph-os.vercel.app");
-  redirect(`${shell}/login`);
+  const destination = (await headers()).get("x-kph-compras-path");
+  const next = destination?.startsWith("/compras") ? destination : "/compras";
+  const login = new URL("/login", shell);
+  login.searchParams.set("next", next);
+  login.searchParams.set("reauth", "1");
+  redirect(login.toString());
 }
 
 /** Falha se o user não tiver pelo menos uma das roles especificadas. */
