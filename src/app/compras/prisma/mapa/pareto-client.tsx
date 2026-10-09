@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getPareto, markSignature } from "@/lib/compras/prisma-pareto-actions";
 import { classifyPareto, menuEconomy, paretoCoverage, paretoKey, type ParetoDish } from "@/lib/compras/prisma-pareto";
 
@@ -64,11 +65,11 @@ export default function ParetoClient({ unit, units }: { unit: string; units: { i
       const points = curve.bars.map((b, index) => `${45 + (index + .5) * (width - 80) / curve.bars.length},${height - 25 - (b.accumulated ?? 0) * (height - 50)}`).join(" ");
       return <section className="pareto-house" key={house.id} aria-label={`Pareto ${tab} · ${house.name}`}>
         <h3>{house.name} <span title={sources[tab]}>{curve.total > 0 ? `${brl(curve.total)} · base calculável` : "Base incompleta"}</span></h3>
-        {curve.total <= 0 && <p role="status" className="map-warning">Base incompleta: não há valor calculável positivo para a curva ABC nesta casa. <a href="/compras/fichas">confirme as fichas em /compras/fichas</a>.</p>}
+        {curve.total <= 0 && <p role="status" className="map-warning">Base incompleta: não há valor calculável positivo para a curva ABC nesta casa. <Link href="/compras/fichas">confirme as fichas em /compras/fichas</Link>.</p>}
         {tab === "pratos" && <aside className="map-warning" aria-label={`Sem base · ${house.name}`}>
           <h4>Sem base · {coverage.count} pratos</h4>
           <p title="Receita Lorean 12m dos produtos sem atribuição calculável / receita Lorean 12m de todos os produtos da casa em produto_venda_ficha, incluindo pontes pendentes. Não usa CMV Lorean.">{coverage.share === null ? "Percentual indisponível: receita Lorean sem base positiva." : `${pct(coverage.share)} da receita Lorean · ${brl(coverage.unknownRevenue)} de ${brl(coverage.revenue)} em 12 meses.`}</p>
-          {coverage.count > 0 && <><p><a href="/compras/fichas">confirme as fichas em /compras/fichas</a>. Estes pratos permanecem fora do ABC e dos cortáveis.</p>
+          {coverage.count > 0 && <><p><Link href="/compras/fichas">confirme as fichas em /compras/fichas</Link>. Estes pratos permanecem fora do ABC e dos cortáveis.</p>
             <details><summary>Ver os {coverage.count} pratos sem base</summary>{curve.unknown.map(r => <p key={r.id}>{r.name} · receita atribuída indisponível{r.dish?.assinatura ? " · ★ Assinatura" : ""}</p>)}</details></>}
         </aside>}
         <p title="Ordenação decrescente; a barra que cruza 80% ainda pertence a A, a que cruza 95% a B; demais C. Os percentuais realizados podem ultrapassar os cortes, mas A+B+C=100%. Base zero não recebe ABC.">
@@ -95,7 +96,7 @@ export default function ParetoClient({ unit, units }: { unit: string; units: { i
             </article>;
           })}
         </div>
-        {tab !== "pratos" && !!curve.unknown.length && <details open className="map-warning"><summary>Sem base · {curve.unknown.length} itens · fora do ABC</summary><p>Receita Lorean não atribuível a estes itens. <a href="/compras/fichas">confirme as fichas em /compras/fichas</a>.</p>{curve.unknown.map(r => <p key={r.id}>{r.name} · {r.detail}{r.dish?.assinatura ? " · ★ Assinatura" : ""}</p>)}</details>}
+        {tab !== "pratos" && !!curve.unknown.length && <details open className="map-warning"><summary>Sem base · {curve.unknown.length} itens · fora do ABC</summary><p>Receita Lorean não atribuível a estes itens. <Link href="/compras/fichas">confirme as fichas em /compras/fichas</Link>.</p>{curve.unknown.map(r => <p key={r.id}>{r.name} · {r.detail}{r.dish?.assinatura ? " · ★ Assinatura" : ""}</p>)}</details>}
         {!rows.length && <p className="map-empty">Sem registros nesta casa.</p>}
       </section>;
     })}

@@ -1,5 +1,6 @@
 "use server";
 import { z } from "zod";
+import { requiredUnitScope } from "./unit-scope";
 import { comprasAccess } from "./everest-access";
 import type { ParetoDish, ParetoIngredient, ParetoSupplier } from "./prisma-pareto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -28,7 +29,7 @@ export async function getPareto() {
     r => roles.includes(r.role.toLowerCase()) && (r.unitId === null || r.unitId === id))) };
 }
 export async function markSignature(raw: unknown) {
-  const v = z.object({ unit_id: z.uuid(), produto_id: z.uuid() }).parse(raw);
+  const v = z.object({ unit_id: requiredUnitScope, produto_id: z.uuid() }).parse(raw);
   const { db, user } = await comprasAccess(v.unit_id);
   if (!user.roles.some(r => roles.includes(r.role.toLowerCase()) && (r.unitId === null || r.unitId === v.unit_id)))
     throw new Error("Seu perfil não pode marcar assinatura nesta casa.");
