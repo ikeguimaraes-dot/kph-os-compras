@@ -14,8 +14,12 @@ import {
   type PurchaseRow,
   type AlertRow,
 } from "./prisma-cockpit";
+const unitScope = z.preprocess(
+  (v) => (typeof v === "string" && !z.uuid().safeParse(v).success ? null : v),
+  z.uuid().nullable(),
+);
 const filterSchema = z.object({
-  unitId: z.uuid().nullable(),
+  unitId: unitScope,
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/),
   comparison: z.enum(["previous", "year"]),
 });
