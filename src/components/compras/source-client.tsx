@@ -1,4 +1,5 @@
 "use client";
+import { useAuth } from "@kph/auth/context";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -94,16 +95,16 @@ function display(key: string, value: unknown) {
 export default function SourceClient({
   kind,
   units,
-  initialUnit,
   initialId,
 }: {
   kind: SourceKind;
   units: { id: string; name: string }[];
-  initialUnit: string;
   initialId?: string;
 }) {
-  const [unit, setUnit] = useState(initialUnit),
-    [search, setSearch] = useState(""),
+  const { unitId, setUnitId: setUnit } = useAuth();
+  const unit = unitId === "all" ? null : unitId;
+  const [detailUnit, setDetailUnit] = useState<string | null>(null);
+  const [search, setSearch] = useState(""),
     [month, setMonth] = useState(""),
     [page, setPage] = useState(0);
   const [data, setData] = useState<Awaited<
@@ -120,6 +121,13 @@ export default function SourceClient({
     [saving, setSaving] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const sequence = useRef(0);
+  useEffect(() => {
+    setPage(0);
+    setData(null);
+    setDetail(null);
+    dialog.current?.close();
+    sequence.current++;
+  }, [unit]);
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -147,8 +155,14 @@ export default function SourceClient({
     setDetail(null);
     dialog.current?.showModal();
     try {
-      const d = await getSourceDetail(kind, unit, row.id);
+      const origin = String(row.unit_id ?? unit ?? "");
+      if (!origin)
+        throw new Error(
+          "Selecione a casa desta ficha no menu para abrir os detalhes.",
+        );
+      const d = await getSourceDetail(kind, origin, row.id);
       if (seq !== sequence.current) return;
+      setDetailUnit(origin);
       setDetail(d);
       setPrice(String(d.parent?.preco_venda ?? ""));
       setCategory(String(d.parent?.categoria ?? ""));
@@ -165,11 +179,11 @@ export default function SourceClient({
       }); /* initial detail is scoped to selected unit */
   }, [initialId]);
   async function save() {
-    if (!detail?.parent?.metadata_id) return;
+    if (!detail?.parent?.metadata_id || !detailUnit) return;
     setSaving(true);
     try {
       await saveMenuMetadata(
-        unit,
+        detailUnit,
         String(detail.parent.metadata_id),
         Number(price),
         category,
@@ -203,12 +217,13 @@ export default function SourceClient({
         <label>
           Casa
           <select
-            value={unit}
+            value={unit ?? "all"}
             onChange={(e) => {
               setUnit(e.target.value);
               setPage(0);
             }}
           >
+            <option value="all">Todas as casas</option>
             {units.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}
@@ -263,6 +278,7 @@ export default function SourceClient({
             <table>
               <thead>
                 <tr>
+                  {!unit && <th>Casa</th>}
                   {columns[kind].map((k) => (
                     <th key={k}>{labels[k] ?? k}</th>
                   ))}
@@ -273,7 +289,12 @@ export default function SourceClient({
               </thead>
               <tbody>
                 {data?.rows.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={`${r.unit_id}:${r.id}`}>
+                    {!unit && (
+                      <td>
+                        {units.find((u) => u.id === r.unit_id)?.name ?? "Casa"}
+                      </td>
+                    )}
                     {columns[kind].map((k) => (
                       <td key={k}>{display(k, r[k])}</td>
                     ))}

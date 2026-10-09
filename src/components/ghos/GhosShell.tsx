@@ -124,7 +124,7 @@ export function GhosMark() {
 function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
-  const { unit, units, setUnit } = useUnit();
+  const { unitId, units, setUnit } = useUnit();
   const { resolvedTheme, setTheme } = useTheme();
   const drawer = useRef<HTMLDialogElement>(null);
   const links = groups.flatMap((g) => g.items);
@@ -165,13 +165,14 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div>
           <select
             aria-label={mobile ? "Casa — menu móvel" : "Casa"}
-            value={unit?.id ?? ""}
+            value={unitId ?? ""}
             onChange={(e) => setUnit(e.target.value)}
             disabled={!units.length}
           >
             <option value="" disabled>
               {units.length ? "Selecionar casa" : "Nenhuma casa disponível"}
             </option>
+            <option value="all">Todas as casas</option>
             {units.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}

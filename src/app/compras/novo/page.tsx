@@ -1,7 +1,4 @@
-import { redirect } from "next/navigation";
-import {
-  listSuppliers,
-} from "@/app/compras/actions";
+import { listSuppliers } from "@/app/compras/actions";
 import { getCurrentUnit } from "@kph/auth/unit";
 import { requireUser } from "@kph/auth/server";
 import { NovoCompraClient } from "./novo-compra-client";
@@ -12,8 +9,11 @@ export default async function NovoPedidoPage() {
   await requireUser();
   const unit = await getCurrentUnit();
   if (!unit || !unit.brand_id) {
-    // Compras exige brand_id (FK NOT NULL). Sem isso volta pra lista.
-    redirect("/compras");
+    return (
+      <p role="status">
+        Selecione uma casa no menu para criar o pedido de compra.
+      </p>
+    );
   }
   const suppliers = await listSuppliers(unit.id);
   return (
