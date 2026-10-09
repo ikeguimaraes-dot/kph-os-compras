@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import {
   // shell
   ChevronDown, ChevronRight, Check, LogOut, Circle,
@@ -331,11 +330,7 @@ const STORAGE_KEY = "kph_sidebar_groups";
 
 // ── Main Sidebar component ──────────────────────────────────────────────────
 
-export function Sidebar(_props?: {
-  tierLevel?: number;
-  approvalsCount?: number;
-  punchAdjCount?: number;
-}) {
+export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { unit, units, setUnit } = useUnit();
@@ -359,9 +354,11 @@ export function Sidebar(_props?: {
     return () => window.removeEventListener("kph:toggleSidebar", onToggle);
   }, []);
 
-  useEffect(() => {
+  const [previousPathname, setPreviousPathname] = useState(pathname);
+  if (previousPathname !== pathname) {
+    setPreviousPathname(pathname);
     setMobileOpen(false);
-  }, [pathname]);
+  }
 
   // ── (b) Fetch nav from shell; fall back to NAV_GROUPS on error
   useEffect(() => {
@@ -406,11 +403,6 @@ export function Sidebar(_props?: {
   const initials = displayName
     ? displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()
     : "?";
-  const emailShort = user?.email
-    ? user.email.length > 22
-      ? user.email.slice(0, 19) + "…"
-      : user.email
-    : "—";
   const role = user?.roles[0]?.role ?? "—";
 
   return (
@@ -498,7 +490,7 @@ export function Sidebar(_props?: {
         </div>
 
         {/* (b) Navigation — driven by effectiveGroups */}
-        <SidebarNav pathname={pathname} groups={effectiveGroups} />
+        <SidebarNav key={pathname} pathname={pathname} groups={effectiveGroups} />
 
         {/* (c) User footer — unchanged */}
         <div style={{ padding: "12px 14px", borderTop: "1px solid var(--sidebar-border)", display: "flex", alignItems: "center", gap: 10 }}>
@@ -546,6 +538,18 @@ export function Sidebar(_props?: {
 
 // ── SidebarNav ──────────────────────────────────────────────────────────────
 
+function subscribeNavigation(notify: () => void) {
+  window.addEventListener("storage", notify);
+  window.addEventListener("kph:navigation", notify);
+  return () => {
+    window.removeEventListener("storage", notify);
+    window.removeEventListener("kph:navigation", notify);
+  };
+}
+function readNavigation() {
+  try { return window.localStorage.getItem(STORAGE_KEY); } catch { return null; }
+}
+
 function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[] }) {
   // Flatten all leaf hrefs for active-detection
   const allHrefs = useMemo(() => flattenHrefs(groups), [groups]);
@@ -581,54 +585,31 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
     return null;
   }, [activeHref, groups]);
 
-  // Group open/close (persisted in localStorage)
-  const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
-    const m: Record<string, boolean> = {};
-    for (const g of groups) m[g.id] = !g.title;
-    return m;
-  });
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const stored = useSyncExternalStore(subscribeNavigation, readNavigation, () => null);
+  const hydrated = useSyncExternalStore(subscribeNavigation, () => true, () => false);
+  const saved = useMemo<Record<string, boolean>>(() => {
+    if (pathname === "/dashboard" || !stored) return {};
     try {
-      if (pathname === "/dashboard") {
-        window.localStorage.removeItem(STORAGE_KEY);
-        setOpenMap(Object.fromEntries(groups.map((g) => [g.id, !g.title])));
-        setHydrated(true);
-        return;
-      }
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Record<string, boolean>;
-        setOpenMap((prev) => ({ ...prev, ...parsed }));
-      }
-    } catch {}
-    setHydrated(true);
-  }, [pathname, groups]);
-
-  // When remote groups load, add any missing group IDs
+      const parsed: unknown = JSON.parse(stored);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+      return Object.fromEntries(Object.entries(parsed).filter(([, value]) => typeof value === "boolean"));
+    } catch { return {}; }
+  }, [stored, pathname]);
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+  const openMap = Object.fromEntries(groups.map((g) => [g.id,
+    overrides[g.id] ?? (g.id === activeGroupId ? true : saved[g.id] ?? !g.title),
+  ]));
   useEffect(() => {
-    setOpenMap((prev) => {
-      const next = { ...prev };
-      for (const g of groups) {
-        if (next[g.id] === undefined) next[g.id] = !g.title;
-      }
-      return next;
-    });
-  }, [groups]);
-
-  useEffect(() => {
-    if (!activeGroupId) return;
-    setOpenMap((prev) => (prev[activeGroupId] ? prev : { ...prev, [activeGroupId]: true }));
-  }, [activeGroupId]);
-
+    if (pathname === "/dashboard") {
+      try { window.localStorage.removeItem(STORAGE_KEY); } catch {}
+      window.dispatchEvent(new Event("kph:navigation"));
+    }
+  }, [pathname]);
   function toggleGroup(id: string) {
-    setOpenMap((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
-      try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
-      return next;
-    });
+    const next = { ...openMap, [id]: !openMap[id] };
+    setOverrides((previous) => ({ ...previous, [id]: next[id]! }));
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+    window.dispatchEvent(new Event("kph:navigation"));
   }
 
   function firstGroupHref(group: NavGroup): string | null {
@@ -654,41 +635,9 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
     if (firstHref && firstHref !== pathname) window.location.assign(firstHref);
   }
 
-  // Sub-menu open/close (not persisted — driven by defaultOpen + active path)
-  const [subOpenMap, setSubOpenMap] = useState<Record<string, boolean>>(() => {
-    const m: Record<string, boolean> = {};
-    for (const g of groups) {
-      for (const it of g.items) {
-        if (it.children && it.defaultOpen) m[`${g.id}:${it.label}`] = true;
-      }
-    }
-    return m;
-  });
-
-  // When remote groups load, seed defaultOpen sub-menus
-  useEffect(() => {
-    setSubOpenMap((prev) => {
-      const next = { ...prev };
-      for (const g of groups) {
-        for (const it of g.items) {
-          if (it.children && it.defaultOpen) {
-            const key = `${g.id}:${it.label}`;
-            if (next[key] === undefined) next[key] = true;
-          }
-        }
-      }
-      return next;
-    });
-  }, [groups]);
-
-  // Auto-open the sub-menu that contains the active page
-  useEffect(() => {
-    if (!activeSubKey) return;
-    setSubOpenMap((prev) => (prev[activeSubKey] ? prev : { ...prev, [activeSubKey]: true }));
-  }, [activeSubKey]);
-
-  function toggleSub(key: string) {
-    setSubOpenMap((prev) => ({ ...prev, [key]: !prev[key] }));
+  const [subOpenMap, setSubOpenMap] = useState<Record<string, boolean>>({});
+  function toggleSub(key: string, current: boolean) {
+    setSubOpenMap((prev) => ({ ...prev, [key]: !current }));
   }
 
   return (
@@ -729,7 +678,7 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
               // Item with children = collapsible sub-menu
               if (it.children?.length) {
                 const subKey = `${g.id}:${it.label}`;
-                const subOpen = subOpenMap[subKey] ?? false;
+                const subOpen = subOpenMap[subKey] ?? (subKey === activeSubKey || !!it.defaultOpen);
                 const anyChildActive = it.children.some(
                   (c) => c.href === activeHref || (c.href && pathname.startsWith(c.href + "/")),
                 );
@@ -737,7 +686,7 @@ function SidebarNav({ pathname, groups }: { pathname: string; groups: NavGroup[]
                   <div key={it.label + idx}>
                     <button
                       type="button"
-                      onClick={() => toggleSub(subKey)}
+                      onClick={() => toggleSub(subKey, subOpen)}
                       style={{
                         display: "flex", alignItems: "center", gap: 12,
                         width: "100%", border: "none", borderRadius: 8,

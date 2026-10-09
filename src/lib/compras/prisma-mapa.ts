@@ -4,23 +4,26 @@ export type MapView = "dinheiro" | "dependencia" | "travados";
 export type MapPeriod = "12m" | "semana";
 export type MapEdge = {
   unit_id: string;
-  raiz_cnpj: string;
+  raiz_cnpj: string | null;
   insumo_id: string;
   produto_venda_ficha_id: string;
   prato: string;
   receita_12m: number;
   receita_semana: number;
-  peso_custo: number;
-  share_fornecedor: number;
-  receita_atribuida: number;
-  critico: boolean;
+  peso_custo: number | null;
+  share_fornecedor: number | null;
+  receita_atribuida: number | null;
+  critico: boolean | null;
   insumo: string;
   categoria: string | null;
   reserva: number;
   ultima_compra: string | null;
   principal_90d: string | null;
-  principal_12m: string;
+  principal_12m: string | null;
   fornecedor_trocou: boolean;
+  preco_unitario: number | null;
+  fonte_preco: "compra" | "historico" | "sem_preco";
+  custo_completo: boolean;
 };
 export type MapSupplier = {
   unit_id: string;
@@ -73,12 +76,27 @@ export type MapFilters = {
 };
 export const mapView = (v: string | null | undefined): MapView =>
   v === "dependencia" || v === "travados" ? v : "dinheiro";
-export const edgeAmount = (e: MapEdge, period: MapPeriod) =>
-  period === "semana"
-    ? Number(e.receita_semana) *
-      Number(e.peso_custo) *
-      Number(e.share_fornecedor)
+export const edgeAmount = (e: MapEdge, period: MapPeriod): number | null => {
+  if (e.peso_custo == null || e.share_fornecedor == null || e.receita_atribuida == null) return null;
+  return period === "semana"
+    ? Number(e.receita_semana) * Number(e.peso_custo) * Number(e.share_fornecedor)
     : Number(e.receita_atribuida);
+};
+export const costLabel = (e: MapEdge) => e.fonte_preco === "sem_preco"
+  ? "Sem preço"
+  : e.peso_custo == null ? "Peso indeterminado · ficha com custo incompleto"
+  : `${(Number(e.peso_custo) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% do custo${e.fonte_preco === "historico" ? " · custo histórico" : ""}`;
+export function unpricedDishes(edges: MapEdge[]) {
+  const dishes = new Map<string, { edge: MapEdge; ingredients: Map<string, MapEdge> }>();
+  for (const edge of edges) {
+    if (edgeAmount(edge, "12m") !== null) continue;
+    const key = dishKey(edge);
+    const dish = dishes.get(key) ?? { edge, ingredients: new Map<string, MapEdge>() };
+    dish.ingredients.set(edge.insumo_id, edge);
+    dishes.set(key, dish);
+  }
+  return [...dishes.values()];
+}
 export const dishKey = (v: {
   unit_id: string;
   produto_venda_ficha_id: string;
@@ -106,7 +124,9 @@ export function buildFlow(
   for (const e of edges) {
     const id = dishKey(e),
       d = dishes.get(id) ?? { id, name: e.prato, value: 0 };
-    d.value += edgeAmount(e, period);
+    const value = edgeAmount(e, period);
+    if (value === null || value <= 0 || !e.raiz_cnpj) continue;
+    d.value += value;
     dishes.set(id, d);
   }
   const ranked = [...dishes.values()].sort(
@@ -133,6 +153,7 @@ export function buildFlow(
   for (const e of edges) {
     const value = edgeAmount(e, period),
       target = top.has(dishKey(e)) ? dishKey(e) : "outros";
+    if (value === null || value <= 0 || !e.raiz_cnpj) continue;
     const color = blocked.has(dishKey(e))
       ? "red"
       : Number(e.reserva) === 0

@@ -11,7 +11,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 // build legacy = roda em Node sem DOM/worker
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import {
   parseFichas,
@@ -36,10 +35,8 @@ async function loadPages(): Promise<TextItemLike[][]> {
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
     const items: TextItemLike[] = content.items
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((it: any) => typeof it.str === "string")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((it: any) => ({
+      .filter((it) => "str" in it)
+      .map((it) => ({
         str: it.str,
         transform: it.transform,
         width: it.width,
@@ -182,7 +179,7 @@ function compareGolden(out: ParsedOut, golden: ParsedOut): CmpResult {
   insDiff += [...oIns.keys()].filter((c) => !gIns.has(c)).length;
 
   // linhas: bucket por (produto, insumo)
-  let lineDiff = Math.abs(out.linhas.length - golden.linhas.length);
+  const lineDiff = Math.abs(out.linhas.length - golden.linhas.length);
 
   const equal = prodDiff === 0 && insDiff === 0 && out.linhas.length === golden.linhas.length;
   return {

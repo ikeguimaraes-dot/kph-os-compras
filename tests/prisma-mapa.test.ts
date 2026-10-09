@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildFlow,filterMap,creditColor,titleTimeline,mapView,edgeAmount,type MapEdge,type MapBlock,type MapTitle} from '../src/lib/compras/prisma-mapa';
-const edge=(v:Partial<MapEdge>={}):MapEdge=>({unit_id:'house-a',raiz_cnpj:'11111111',insumo_id:'item-a',produto_venda_ficha_id:'dish-a',prato:'Prato A',receita_12m:1000,receita_semana:20,peso_custo:.4,share_fornecedor:.5,receita_atribuida:200,critico:true,insumo:'Ingrediente A',categoria:'Proteínas',reserva:0,ultima_compra:'2026-09-20',principal_90d:'11111111',principal_12m:'22222222',fornecedor_trocou:true,...v});
+import {buildFlow,filterMap,creditColor,titleTimeline,mapView,edgeAmount,costLabel,unpricedDishes,type MapEdge,type MapBlock,type MapTitle} from '../src/lib/compras/prisma-mapa';
+const edge=(v:Partial<MapEdge>={}):MapEdge=>({unit_id:'house-a',raiz_cnpj:'11111111',insumo_id:'item-a',produto_venda_ficha_id:'dish-a',prato:'Prato A',receita_12m:1000,receita_semana:20,peso_custo:.4,share_fornecedor:.5,receita_atribuida:200,critico:true,insumo:'Ingrediente A',categoria:'Proteínas',reserva:0,ultima_compra:'2026-09-20',principal_90d:'11111111',principal_12m:'22222222',fornecedor_trocou:true,preco_unitario:10,fonte_preco:"compra",custo_completo:true,...v});
 const block:MapBlock={id:'block-a',unit_id:'house-a',prato_id:'dish-a',inicio:'2026-10-01',causa:null,confirmado:false,status:'aberto',nome:'Prato A'};
 test('espessura conserva receita por casa, inclusive top 12 e outros',()=>{
  const rows=Array.from({length:20},(_,i)=>edge({produto_venda_ficha_id:`dish-${i}`,receita_atribuida:i+1,raiz_cnpj:i%2?'11111111':'22222222'}));
@@ -35,4 +35,22 @@ test('linha do tempo reconcilia duplicatas, a conciliar, fora do eixo e sem venc
 });
 test('visão da URL aceita apenas as três posições',()=>{
  assert.equal(mapView('dependencia'),'dependencia');assert.equal(mapView('travados'),'travados');assert.equal(mapView('invalid'),'dinheiro');assert.equal(mapView(undefined),'dinheiro');
+});
+
+test('custo desconhecido permanece nulo e visível sem fabricar fluxo financeiro',()=>{
+ const missing=edge({peso_custo:null,receita_atribuida:null,preco_unitario:null,fonte_preco:'sem_preco',custo_completo:false,raiz_cnpj:null,share_fornecedor:null});
+ const priced=edge({insumo_id:'item-b',peso_custo:null,receita_atribuida:null,custo_completo:false});
+ assert.equal(edgeAmount(missing,'12m'),null);assert.equal(edgeAmount(priced,'semana'),null);
+ assert.equal(costLabel(missing),'Sem preço');assert.match(costLabel(priced),/indeterminado/);
+ const rows=[missing,priced,{...priced,raiz_cnpj:'22222222'}];
+ assert.equal(filterMap(rows,[],{unit:'house-a',period:'12m',category:'',only86:false,noReserve:false}).length,3);
+ const pending=unpricedDishes(rows);assert.equal(pending.length,1);assert.equal(pending[0]!.ingredients.size,2);
+ const flow=buildFlow(rows,[],'12m');assert.deepEqual(flow.sources,[]);assert.deepEqual(flow.links,[]);assert.deepEqual(flow.targets,[]);
+});
+test('fluxo soma somente valores conhecidos e histórico mantém sua origem',()=>{
+ const historical=edge({fonte_preco:'historico'});
+ const unknown=edge({produto_venda_ficha_id:'dish-b',peso_custo:null,receita_atribuida:null,custo_completo:false});
+ const flow=buildFlow([historical,unknown],[],'12m');assert.equal(flow.total,200);assert.equal(flow.targets.length,1);
+ assert.equal(edgeAmount(historical,'semana'),4);assert.match(costLabel(historical),/histórico/);
+ assert.equal(unpricedDishes([historical,unknown]).length,1);
 });

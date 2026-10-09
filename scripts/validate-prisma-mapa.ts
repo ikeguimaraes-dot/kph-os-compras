@@ -22,7 +22,13 @@ const byHouse=[...new Set(suppliers.map(s=>s.unit_id))].map(unit=>{
  return {unit,view,source:flow.total,links:flow.links.reduce((s,l)=>s+l.value,0),targets:flow.targets.reduce((s,t)=>s+t.value,0),pass:close(flow.total,view)&&close(flow.links.reduce((s,l)=>s+l.value,0),view)&&close(flow.targets.reduce((s,t)=>s+t.value,0),view)};
 });results.O1={pass:byHouse.every(r=>r.pass),houses:byHouse};
 const dish=edges.filter(e=>e.unit_id===config.unit&&e.prato===config.sharedDish),flow=buildFlow(dish,[],'12m'),revenue=Number(dish[0]?.receita_12m??0);
-results.O2={pass:dish.length>0&&flow.sources.length>1&&flow.sources.every(s=>s.value<revenue)&&flow.total<=revenue+.01,revenue,attributed:flow.total,suppliers:flow.sources};
+const unknown=dish.filter(e=>e.receita_atribuida==null),missing=[...new Map(dish.filter(e=>e.fonte_preco==='sem_preco').map(e=>[e.insumo_id,{id:e.insumo_id,name:e.insumo}])).values()];
+const dishSuppliers=[...new Set(dish.flatMap(e=>e.raiz_cnpj?[e.raiz_cnpj]:[]))].map(root=>{const rows=dish.filter(e=>e.raiz_cnpj===root);return {root,edges:rows.length,attributed:rows.some(e=>e.receita_atribuida==null)?null:rows.reduce((s,e)=>s+Number(e.receita_atribuida),0)};});
+results.O2={pass:dish.length>0&&unknown.length===0&&flow.sources.length>1&&flow.sources.every(s=>s.value<revenue)&&flow.total<=revenue+.01,
+ status:unknown.length?'blocked_missing_cost':'evaluated',revenue,attributed:unknown.length?null:flow.total,
+ edges:dish.length,ingredients:new Set(dish.map(e=>e.insumo_id)).size,unknownEdges:unknown.length,missingPrices:missing,
+ preservationPass:dish.length>0&&missing.every(m=>dish.some(e=>e.insumo_id===m.id&&e.peso_custo===null&&e.receita_atribuida===null)),
+ suppliers:dishSuppliers};
 const changed=edges.filter(e=>e.unit_id===config.unit&&e.prato===config.changedDish).sort((a,b)=>Number(b.peso_custo)-Number(a.peso_custo))[0];
 results.O3={pass:!!changed&&changed.principal_90d!==null&&changed.principal_90d!==config.oldRoot&&changed.fornecedor_trocou,ingredient:changed?.insumo,principal90:changed?.principal_90d,principal12:changed?.principal_12m};
 const debt=titles.filter(t=>t.raiz_cnpj===config.debtRoot),overdue=debt.filter(t=>Number(t.dias_atraso)>0).reduce((s,t)=>s+Number(t.vl_saldo),0);

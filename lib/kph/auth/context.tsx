@@ -78,7 +78,7 @@ export function AuthProvider({
   const signOut = async () => {
     // Centralizado em rota — limpa cookies via Server Action e redireciona.
     if (typeof window !== "undefined") {
-      window.location.href = "/auth/sign-out";
+      router.push("/auth/sign-out");
     }
   };
 

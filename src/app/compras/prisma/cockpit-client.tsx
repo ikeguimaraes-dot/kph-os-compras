@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   getCockpit,
@@ -228,7 +229,6 @@ function Waterfall({
   data: NonNullable<Cockpit["waterfall"]>;
   onBar: (key: string) => void;
 }) {
-  let acc = data.start;
   const all = [
     {
       key: "start",
@@ -237,10 +237,9 @@ function Waterfall({
       from: 0,
       to: data.start,
     },
-    ...data.bars.map((b) => {
-      const from = acc;
-      acc += b.value;
-      return { ...b, from, to: acc };
+    ...data.bars.map((b, index) => {
+      const from = data.start + data.bars.slice(0, index).reduce((sum, bar) => sum + bar.value, 0);
+      return { ...b, from, to: from + b.value };
     }),
     { key: "end", label: "Atual", value: data.end, from: 0, to: data.end },
   ];
@@ -337,10 +336,14 @@ export default function CockpitClient({
   const [bar, setBar] = useState<string | null>(null),
     [menuGroup, setMenuGroup] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    let active = true;
+  const [previousRequest, setPreviousRequest] = useState({ filter, revision });
+  if (previousRequest.filter !== filter || previousRequest.revision !== revision) {
+    setPreviousRequest({ filter, revision });
     setLoading(true);
     setError("");
+  }
+  useEffect(() => {
+    let active = true;
     getCockpit(filter)
       .then((d) => {
         if (active) {
@@ -422,11 +425,11 @@ export default function CockpitClient({
   return (
     <article className="prisma cockpit">
       <nav className="cockpit-nav" aria-label="Detalhes do Prisma">
-        <a href="/compras">Compras</a>
+        <Link href="/compras">Compras</Link>
         <span>/ Prisma</span>
-        <a href="/compras/abastecimento">Rotina de abastecimento ↗</a>
-        <a href="/compras/prisma/mapa">Mapa de dependências ↗</a>
-        <a href="/compras/fichas">Revisar fichas ↗</a>
+        <Link href="/compras/abastecimento">Rotina de abastecimento ↗</Link>
+        <Link href="/compras/prisma/mapa">Mapa de dependências ↗</Link>
+        <Link href="/compras/fichas">Revisar fichas ↗</Link>
         <div>
           {[
             ["categorias", "Categorias"],
@@ -882,7 +885,7 @@ export default function CockpitClient({
                 <div className="cockpit-empty">
                   Não há receita e fichas com custo nos dois períodos para
                   atribuir a variação.{" "}
-                  <a href="/compras/fichas">Revisar a ponte →</a>
+                  <Link href="/compras/fichas">Revisar a ponte →</Link>
                 </div>
               )}
               <Formula>
@@ -1367,9 +1370,9 @@ export default function CockpitClient({
                     <h3>{a.titulo}</h3>
                     <p>{a.detalhe}</p>
                     {a.tipo === "abastecimento" && (
-                      <a href="/compras/abastecimento">
+                      <Link href="/compras/abastecimento">
                         Conferir causa e registro de 86 na fila →
-                      </a>
+                      </Link>
                     )}
                     {a.tipo === "consumo_maior_compra" ? (
                       <p>

@@ -54,8 +54,9 @@ As versões posteriores à consolidação são alterações novas, aplicadas uma
 | 20261008192939 | prisma_mapa_dependencia | Já aplicada; não reaplicar. |
 | 20261008193301 | prisma_mapa_fila | Já aplicada; não reaplicar. |
 | 20261008224131 | prisma_mapa_materializacao | Estrutura instalada externamente; SQL capturado do catálogo e apenas histórico reconciliado nesta retomada. |
+| 20261009051237 | prisma_mapa_preco_fallback | Aplicada uma vez: fallback histórico, dependências sem preço preservadas e refresh da MV. |
 
-A última versão preserva o cálculo em `v_mapa_aresta_calc`, cria
+A versão de materialização preserva o cálculo em `v_mapa_aresta_calc`, cria
 `mv_mapa_aresta` com os dois índices existentes, expõe a nova `v_mapa_aresta`
 e recria `v_mapa_fornecedor`. Definições, opções e privilégios seguem o banco.
 O arquivo não foi executado no projeto compartilhado: somente sua versão,
@@ -64,4 +65,7 @@ nome e SQL foram registrados em `supabase_migrations.schema_migrations`.
 O registro reproduz o estado existente e não adiciona agendamento de refresh.
 Não foi encontrado job em `cron.job` referenciando `mv_mapa_aresta`; a leitura
 rápida da materializada não comprova atualização automática após mudanças nas
-fontes. Refresh e aceitação da interface permanecem pendentes.
+fontes. A versão `20261009051237` executou um refresh após atualizar o cálculo e
+recriar a MV, preservando os dois índices e o acesso exclusivo de serviço.
+Ela não adiciona cron. Política automática de refresh e aceitação da interface
+continuam pendentes. As migrations anteriores não foram reaplicadas.

@@ -29,7 +29,7 @@ import {
 } from "@kph/ui/dialog";
 import { Textarea } from "@kph/ui/textarea";
 import { formatBRL } from "@/lib/format";
-import type { PriceQuoteRow, PriceQuoteItemRow, QuoteStatus } from "@kph/db/types/database";
+import type { PriceQuoteItemRow, QuoteStatus } from "@kph/db/types/database";
 
 import {
   createQuote,

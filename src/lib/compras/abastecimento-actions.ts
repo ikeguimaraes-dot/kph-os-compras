@@ -1,4 +1,5 @@
 "use server";
+import type { SupplyRows } from "./abastecimento-rows";
 import { z } from "zod";
 import { comprasAccess } from "./everest-access";
 import {
@@ -46,13 +47,13 @@ async function writeAccess(
     throw new Error("Seu perfil não pode alterar este registro.");
   return a;
 }
-async function readAll(
+async function readAll<T extends keyof SupplyRows>(
   db: SupabaseClient,
-  table: string,
+  table: T,
   ids: string[],
   order = "id",
 ) {
-  const rows: Record<string, any>[] = [];
+  const rows: SupplyRows[T][] = [];
   for (let start = 0; ; start += 1000) {
     const r = await db
       .from(table)
@@ -61,7 +62,7 @@ async function readAll(
       .order(order)
       .range(start, start + 999);
     if (r.error) throw new Error(r.error.message);
-    rows.push(...r.data);
+    rows.push(...(r.data as unknown as SupplyRows[T][]));
     if (r.data.length < 1000) return rows;
   }
 }

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   getMapSupplierDetail,
@@ -13,9 +14,10 @@ import {
   buildFlow,
   creditColor,
   dishKey,
-  edgeAmount,
   filterMap,
   isCritical,
+  costLabel,
+  unpricedDishes,
   mapView,
   titleTimeline,
   type MapBlock,
@@ -173,13 +175,14 @@ export default function MapClient({
   const blockedDishes = [...shownDishes.values()].sort(
     (a, b) => Number(b.receita_semana) - Number(a.receita_semana),
   );
+  const pendingPrices = unpricedDishes(edges);
   const coveredIds = new Set(data.edges.map(dishKey));
   const uncovered = blocks.filter((b) => !coveredIds.has(blockKey(b)));
   return (
     <main className="mapa">
       <nav className="map-nav" aria-label="Prisma">
-        <a href="/compras/prisma">← Cockpit</a>
-        <a href="/compras/abastecimento">Rotina de abastecimento ↗</a>
+        <Link href="/compras/prisma">← Cockpit</Link>
+        <Link href="/compras/abastecimento">Rotina de abastecimento ↗</Link>
       </nav>
       <header className="map-heading">
         <div>
@@ -458,7 +461,7 @@ export default function MapClient({
                           <span>
                             {d.insumo}{" "}
                             <Metric source="Custo do insumo / custo completo da ficha Everest.">
-                              {pct(d.peso_custo)}
+                              {costLabel(d)}
                             </Metric>
                           </span>
                           <strong>
@@ -494,16 +497,31 @@ export default function MapClient({
             )}
             {!!uncovered.length && (
               <p className="map-warning">
-                <Metric source="Registros abertos sem aresta com ficha confirmada, custo completo e fornecedor identificado.">{`${uncovered.length} registros`}</Metric>{" "}
+                <Metric source="Registros abertos sem dependência de ficha confirmada no mapa.">{`${uncovered.length} registros`}</Metric>{" "}
                 ainda sem dependência calculável.{" "}
-                <a href="/compras/abastecimento">Revisar a fila de 86 ↗</a>
+                <Link href="/compras/abastecimento">Revisar a fila de 86 ↗</Link>
               </p>
             )}
           </>
         )}
       </section>
+      {!!pendingPrices.length && (
+        <section className="map-warning" aria-label="Pratos com atribuição pendente">
+          <h2>Dependências com valor pendente</h2>
+          <p>Estes pratos continuam no mapa. A receita atribuída é indeterminada e não compõe a espessura do fluxo até completar custos e fornecedores.</p>
+          {pendingPrices.map(({ edge, ingredients }) => (
+            <details key={dishKey(edge)}>
+              <summary>{edge.prato} · {data.units.find((u) => u.id === edge.unit_id)?.name} · {edge.custo_completo ? "Sem fornecedor identificado" : "Ficha com custo incompleto"}</summary>
+              <p>Receita do prato: {brl(Number(edge.receita_12m))} em 12 meses; não distribuída entre fornecedores.</p>
+              <ul>{[...ingredients.values()].map((ingredient) => (
+                <li key={ingredient.insumo_id}>{ingredient.insumo} · {costLabel(ingredient)}{ingredient.raiz_cnpj === null ? " · sem fornecedor identificado" : ""}</li>
+              ))}</ul>
+            </details>
+          ))}
+        </section>
+      )}
       <footer className="map-foot">
-        Prévia: somente fichas confirmadas e com todos os custos conhecidos.
+        Prévia: fichas confirmadas. O fluxo financeiro exige custo completo; as demais dependências permanecem sinalizadas.
         Receita sem cobertura não vira zero. Abertura na fila de 86 não confirma
         a causa. Dados consultados em {date(data.readAt)}.
       </footer>
@@ -798,7 +816,7 @@ function Dependency({
               {e.fornecedor_trocou && (
                 <span
                   className="map-badge purple"
-                  title={`Maior share por quantidade em 90d difere de 12m. Anual: ${names.get(e.principal_12m) ?? e.principal_12m}. Fonte: v_mapa_share.`}
+                  title={`Maior share por quantidade em 90d difere de 12m. Anual: ${names.get(e.principal_12m ?? "") ?? e.principal_12m}. Fonte: v_mapa_share.`}
                 >
                   Fornecedor trocou
                 </span>
@@ -817,7 +835,7 @@ function Dependency({
                       <Metric source="Receita da ponte em 12m / semanas da janela. Média histórica, prévia.">{`${compact(d.receita_semana)} / semana`}</Metric>
                     </p>
                     <p>
-                      <Metric source="Custo do insumo / custo completo da ficha × 100; v_ficha_explodida e v_preco_medio_compra.">{`${pct(d.peso_custo)} do custo`}</Metric>
+                      <Metric source="Custo do insumo / custo completo da ficha × 100. Preço de compra; na ausência, último custo histórico Everest da mesma casa. Sem custo completo, peso indeterminado.">{costLabel(d)}</Metric>
                       {isCritical(d) && (
                         <span className="amber"> · crítico</span>
                       )}
@@ -1190,7 +1208,7 @@ function SupplierDrawer({
         >
           Levar ao plano
         </button>
-        <a href="/compras/abastecimento/acordos">Revisar acordos ↗</a>
+        <Link href="/compras/abastecimento/acordos">Revisar acordos ↗</Link>
       </div>
       {!filters.unit && <p>Selecione uma casa no mapa para abrir acordo.</p>}
     </dialog>
