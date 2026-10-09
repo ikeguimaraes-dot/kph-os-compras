@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import type { CurrentUser } from "./server";
 import type { Unit } from "@kph/db/types/database";
+import { ALL_UNITS, UNIT_COOKIE, resolveUnitSelection } from "./unit-selection";
 import { getBrowserClient } from "@kph/db/supabase/client";
 
 type AuthContextValue = {
@@ -16,7 +17,10 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const STORED_UNIT_KEY = "kph_unit_id";
+const STORED_UNIT_KEY = UNIT_COOKIE;
+const subscribeHydration = () => () => {};
+const clientHydrated = () => true;
+const serverHydrated = () => false;
 // Cookie espelha o localStorage pra Server Components conseguirem ler.
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 ano
 
@@ -37,28 +41,28 @@ export function AuthProvider({
   user,
   units,
   children,
+  initialUnitId,
 }: {
   user: CurrentUser | null;
   units: Unit[];
+  initialUnitId?: string | null;
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const [unitId, setUnitIdState] = useState<string | null>(null);
-
+  const hydrated = useSyncExternalStore(subscribeHydration, clientHydrated, serverHydrated);
+  const [unitId, setUnitIdState] = useState<string | null>(() =>
+    resolveUnitSelection(initialUnitId ?? (hydrated ? window.localStorage.getItem(STORED_UNIT_KEY) : null), units),
+  );
+  const [previousSelection, setPreviousSelection] = useState({ units, initialUnitId, hydrated });
+  if (previousSelection.units !== units || previousSelection.initialUnitId !== initialUnitId || previousSelection.hydrated !== hydrated) {
+    setPreviousSelection({ units, initialUnitId, hydrated });
+    const stored = hydrated ? window.localStorage.getItem(STORED_UNIT_KEY) : null;
+    // O cookie do servidor prevalece para evitar divergência após recarregar.
+    setUnitIdState(resolveUnitSelection(initialUnitId ?? stored, units));
+  }
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(STORED_UNIT_KEY);
-    const valid = stored && units.some((u) => u.id === stored) ? stored : null;
-    const fallback = units[0]?.id ?? null;
-    const next = valid ?? fallback;
-    // Hidratação do localStorage — setState dentro de useEffect é intencional
-    // aqui (não dá pra ler localStorage durante render). Cookie já vem do
-    // servidor; este useEffect só cobre o caso "localStorage tem unit que
-    // o cookie expirou" — re-escreve o cookie no `persistUnit` abaixo.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUnitIdState(next);
-    if (next) persistUnit(next);
-  }, [units]);
+    if (hydrated && unitId) persistUnit(unitId);
+  }, [hydrated, unitId]);
 
   /**
    * Troca a unit e invalida o tree do servidor.
@@ -69,7 +73,8 @@ export function AuthProvider({
    * de getCurrentUnit) ao trocar pra Meet & Eat e mudar de página.
    */
   const setUnitId = (id: string) => {
-    if (id === unitId) return;
+    if (id === unitId || (id !== ALL_UNITS && !units.some((u) => u.id === id)))
+      return;
     setUnitIdState(id);
     persistUnit(id);
     router.refresh();
@@ -108,7 +113,13 @@ export function useRoles() {
 export function useUnit() {
   const { units, unitId, setUnitId } = useAuth();
   const unit = units.find((u) => u.id === unitId) ?? null;
-  return { unit, units, setUnit: setUnitId };
+  return {
+    unit,
+    units,
+    unitId,
+    allUnits: unitId === ALL_UNITS,
+    setUnit: setUnitId,
+  };
 }
 
 /** Helper barato pra checar role no client (não substitui RLS no servidor). */

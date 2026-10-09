@@ -1,4 +1,5 @@
 "use client";
+import { useAuth } from "@kph/auth/context";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -319,8 +320,9 @@ export default function CockpitClient({
   initialUnit: string | null;
   completeMonths: Record<string, string | null>;
 }) {
+  const { unitId: selectedHouse, setUnitId: selectHouse } = useAuth();
   const [filter, setFilter] = useState<CockpitFilter>({
-      unitId: initialUnit,
+      unitId: selectedHouse === "all" ? null : (selectedHouse ?? initialUnit),
       month: initialMonth,
       comparison: "previous",
     }),
@@ -336,6 +338,14 @@ export default function CockpitClient({
   const [bar, setBar] = useState<string | null>(null),
     [menuGroup, setMenuGroup] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
+  const [previousHouse, setPreviousHouse] = useState(selectedHouse);
+  if (previousHouse !== selectedHouse) {
+    setPreviousHouse(selectedHouse);
+    const unitId = selectedHouse === "all" ? null : selectedHouse;
+    setFilter((current) => current.unitId === unitId ? current : { ...current, unitId });
+    setDraft((current) => current.unitId === unitId ? current : { ...current, unitId });
+    setData(null);
+  }
   const [previousRequest, setPreviousRequest] = useState({ filter, revision });
   if (previousRequest.filter !== filter || previousRequest.revision !== revision) {
     setPreviousRequest({ filter, revision });
@@ -457,6 +467,7 @@ export default function CockpitClient({
           e.preventDefault();
           setData(null);
           setFilter({ ...draft });
+          selectHouse(draft.unitId ?? "all");
           setNotice("");
         }}
       >

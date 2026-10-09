@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "GHOS · Compras", template: "%s · GHOS" },
+  title: { default: "GHOST · Compras", template: "%s · GHOST" },
   description: "Compras, abastecimento e inteligência de margem do Grupo KPH.",
 };
 

@@ -124,7 +124,7 @@ export function GhosMark() {
 function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
-  const { unit, units, setUnit } = useUnit();
+  const { unitId, units, setUnit } = useUnit();
   const { resolvedTheme, setTheme } = useTheme();
   const drawer = useRef<HTMLDialogElement>(null);
   const links = groups.flatMap((g) => g.items);
@@ -142,12 +142,12 @@ function Shell({ children }: { children: React.ReactNode }) {
         <Link
           href="/compras/inicio"
           className="ghos-brand"
-          aria-label="GHOS — início"
+          aria-label="GHOST — início"
           onClick={() => drawer.current?.close()}
         >
           <GhosMark />
           <span>
-            ghos<small>COMPRAS · GRUPO KPH</small>
+            ghost<small>COMPRAS · GRUPO KPH</small>
           </span>
         </Link>
         {mobile && (
@@ -165,13 +165,14 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div>
           <select
             aria-label={mobile ? "Casa — menu móvel" : "Casa"}
-            value={unit?.id ?? ""}
+            value={unitId ?? ""}
             onChange={(e) => setUnit(e.target.value)}
             disabled={!units.length}
           >
             <option value="" disabled>
               {units.length ? "Selecionar casa" : "Nenhuma casa disponível"}
             </option>
+            <option value="all">Todas as casas</option>
             {units.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}
@@ -233,7 +234,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <dialog
         ref={drawer}
         className="ghos-mobile-menu"
-        aria-label="Menu GHOS"
+        aria-label="Menu GHOST"
         onClick={(event) => {
           if (event.target === event.currentTarget) drawer.current?.close();
         }}
@@ -250,7 +251,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Menu size={21} />
           </button>
           <nav aria-label="Localização">
-            <Link href="/compras/inicio">GHOS</Link>
+            <Link href="/compras/inicio">GHOST</Link>
             <span>/</span>
             <strong>{label}</strong>
           </nav>

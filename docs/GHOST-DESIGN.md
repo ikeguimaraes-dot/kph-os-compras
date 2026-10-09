@@ -1,12 +1,12 @@
-# GHOS · Compras
+# GHOST · Compras
 
-GHOS é a identidade do produto de Compras do Grupo KPH. Prisma permanece como cockpit de margem dentro dele.
+GHOST é a identidade do produto de Compras do Grupo KPH. O nome vem de “ghost”, fantasma: o trabalho nos bastidores que sustenta a experiência sem precisar aparecer. Prisma permanece como cockpit de margem dentro dele.
 
 ## Entrada e navegação
 
 - Entrada: `/compras/inicio`. A raiz do aplicativo direciona para essa página.
 - `/compras` continua sendo Pedidos de compra, preservando links existentes.
-- A navegação do GHOS contém apenas Compras, organizada em visão e direção, operação, cozinha e base.
+- A navegação do GHOST contém apenas Compras, organizada em visão e direção, operação, cozinha e base.
 - O link KPH OS retorna à plataforma principal. O domínio canônico e o login compartilhado permanecem os mesmos.
 - A casa selecionada usa o contexto existente de autorização e seleção; não cria uma sessão paralela.
 

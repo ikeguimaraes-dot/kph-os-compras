@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
 import type { Unit } from "@kph/db/types/database";
 
-const COOKIE_KEY = "kph_unit_id";
+import { ALL_UNITS, UNIT_COOKIE } from "./unit-selection";
+const COOKIE_KEY = UNIT_COOKIE;
 
 /**
  * Resolve a unit selecionada (server-side) lendo o cookie escrito pelo
@@ -22,6 +23,8 @@ export async function getCurrentUnit(): Promise<Unit | null> {
 
     const cookieStore = await cookies();
     const cookieId = cookieStore.get(COOKIE_KEY)?.value;
+
+    if (cookieId === ALL_UNITS) return null;
 
     // 1) Tenta resolver pela unit no cookie. Se RLS bloquear ou não existir,
     //    cai no fallback abaixo.
@@ -51,7 +54,9 @@ export async function getCurrentUnit(): Promise<Unit | null> {
     }
     const first = data?.[0];
     if (!first) {
-      console.warn("[getCurrentUnit] user não tem unit acessível (RLS sem match)");
+      console.warn(
+        "[getCurrentUnit] user não tem unit acessível (RLS sem match)",
+      );
       return null;
     }
     return first as Unit;

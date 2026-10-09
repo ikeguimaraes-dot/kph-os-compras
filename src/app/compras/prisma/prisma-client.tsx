@@ -1,4 +1,5 @@
 "use client";
+import { useAuth } from "@kph/auth/context";
 import Link from "next/link";
 import { saveSupplierAlias } from "@/lib/compras/prisma-cockpit-actions";
 import { useEffect, useRef, useState } from "react";
@@ -62,8 +63,9 @@ export default function PrismaClient({
   initialRoot?: string;
   canEditNames?: boolean;
 }) {
+  const { unitId: selectedHouse, setUnitId: selectHouse } = useAuth();
   const [filter, setFilter] = useState<PrismaFilter>({
-    unitId: initialUnitId,
+    unitId: selectedHouse === "all" ? null : (selectedHouse ?? initialUnitId),
     start: initialStart,
     end: initialEnd,
   });
@@ -98,6 +100,14 @@ export default function PrismaClient({
   }
   const modal = useRef<HTMLDialogElement>(null);
   const pendingRoot = useRef(initialRoot);
+  const [previousHouse, setPreviousHouse] = useState(selectedHouse);
+  if (previousHouse !== selectedHouse) {
+    setPreviousHouse(selectedHouse);
+    const unitId = selectedHouse === "all" ? null : selectedHouse;
+    setFilter((current) => current.unitId === unitId ? current : { ...current, unitId });
+    setDraft((current) => current.unitId === unitId ? current : { ...current, unitId });
+    setData(null);
+  }
   const [previousRequest, setPreviousRequest] = useState({ filter, refresh });
   if (previousRequest.filter !== filter || previousRequest.refresh !== refresh) {
     setPreviousRequest({ filter, refresh });
@@ -246,6 +256,7 @@ export default function PrismaClient({
           onSubmit={(e) => {
             e.preventDefault();
             setFilter({ ...draft });
+            selectHouse(draft.unitId ?? "all");
             setNotice("");
           }}
         >

@@ -35,7 +35,7 @@ async function CotacoesSection() {
   if (!unit) {
     return (
       <div style={{ background: "var(--surface)", border: "1px dashed var(--border)", borderRadius: 8, padding: "32px 22px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
-        Selecione uma unit no topo para ver as cotações.
+        Selecione uma casa no menu para consultar e criar cotações.
       </div>
     );
   }
