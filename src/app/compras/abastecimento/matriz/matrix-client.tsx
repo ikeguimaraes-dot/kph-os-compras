@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   getBrandMatrix,
@@ -49,8 +50,8 @@ export default function MatrixClient() {
   return (
     <main className="supply">
       <nav>
-        <a href="/compras/abastecimento">← Abastecimento</a>
-        <a href="/compras/prisma/estrategia">Estratégia</a>
+        <Link href="/compras/abastecimento">← Abastecimento</Link>
+        <Link href="/compras/prisma/estrategia">Estratégia</Link>
       </nav>
       <header>
         <p className="eyebrow">PILOTO DE CONSOLIDAÇÃO</p>
@@ -230,8 +231,8 @@ function QuoteForm({
   disabled,
   act,
 }: {
-  item: Record<string, any>;
-  quotes: Record<string, any>[];
+  item: Awaited<ReturnType<typeof getBrandMatrix>>["items"][number];
+  quotes: Awaited<ReturnType<typeof getBrandMatrix>>["quotes"];
   disabled: boolean;
   act: (fn: () => Promise<unknown>, s: string) => Promise<void>;
 }) {

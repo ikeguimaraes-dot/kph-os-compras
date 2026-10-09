@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import type { CurrentUser } from "./server";
 import type { Unit } from "@kph/db/types/database";
@@ -18,6 +18,9 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const STORED_UNIT_KEY = UNIT_COOKIE;
+const subscribeHydration = () => () => {};
+const clientHydrated = () => true;
+const serverHydrated = () => false;
 // Cookie espelha o localStorage pra Server Components conseguirem ler.
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 ano
 
@@ -46,18 +49,20 @@ export function AuthProvider({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const [unitId, setUnitIdState] = useState<string | null>(
-    initialUnitId ?? null,
+  const hydrated = useSyncExternalStore(subscribeHydration, clientHydrated, serverHydrated);
+  const [unitId, setUnitIdState] = useState<string | null>(() =>
+    resolveUnitSelection(initialUnitId ?? (hydrated ? window.localStorage.getItem(STORED_UNIT_KEY) : null), units),
   );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(STORED_UNIT_KEY);
-    const next = resolveUnitSelection(initialUnitId ?? stored, units);
+  const [previousSelection, setPreviousSelection] = useState({ units, initialUnitId, hydrated });
+  if (previousSelection.units !== units || previousSelection.initialUnitId !== initialUnitId || previousSelection.hydrated !== hydrated) {
+    setPreviousSelection({ units, initialUnitId, hydrated });
+    const stored = hydrated ? window.localStorage.getItem(STORED_UNIT_KEY) : null;
     // O cookie do servidor prevalece para evitar divergência após recarregar.
-    setUnitIdState(next);
-    if (next) persistUnit(next);
-  }, [units, initialUnitId]);
+    setUnitIdState(resolveUnitSelection(initialUnitId ?? stored, units));
+  }
+  useEffect(() => {
+    if (hydrated && unitId) persistUnit(unitId);
+  }, [hydrated, unitId]);
 
   /**
    * Troca a unit e invalida o tree do servidor.
@@ -78,7 +83,7 @@ export function AuthProvider({
   const signOut = async () => {
     // Centralizado em rota — limpa cookies via Server Action e redireciona.
     if (typeof window !== "undefined") {
-      window.location.href = "/auth/sign-out";
+      router.push("/auth/sign-out");
     }
   };
 

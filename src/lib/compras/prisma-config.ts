@@ -1,4 +1,6 @@
 export const PRISMA = {
+  mapaCriticalCost: 0.15,
+  mapaStalePurchaseDays: 45,
   pareto: 0.8,
   alertPricePremium: 0.08,
   alertInvoiceMultiple: 2,

@@ -2,6 +2,9 @@
 out/
 build/
 node_modules/
+/node_modules
+/docs/PRISMA-MAPA-VALIDACAO.md
+/docs/prisma-mapa-evidencias/
 .env
 .env.local
 .env*.local

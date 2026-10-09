@@ -1,6 +1,7 @@
 "use client";
 import { useAuth } from "@kph/auth/context";
-import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   getSupply,
   saveSupply,
@@ -37,10 +38,15 @@ export default function SupplyClient({ mode = "rotina" }: { mode?: Mode }) {
     [busy, setBusy] = useState(false),
     [search, setSearch] = useState(""),
     [status, setStatus] = useState("");
-  useEffect(() => {
-    let live = true;
+  const requestKey = JSON.stringify([unit, mode, revision]);
+  const [previousRequest, setPreviousRequest] = useState(requestKey);
+  if (previousRequest !== requestKey) {
+    setPreviousRequest(requestKey);
     setData(null);
     setError("");
+  }
+  useEffect(() => {
+    let live = true;
     getSupply(unit, mode)
       .then((d) => {
         if (live) setData(d);
@@ -91,9 +97,10 @@ export default function SupplyClient({ mode = "rotina" }: { mode?: Mode }) {
   return (
     <main className="supply">
       <nav aria-label="Abastecimento">
-        <a href="/compras/prisma">← Prisma</a>
+        <Link href="/compras/prisma">← Prisma</Link>
         {[
           ["/compras/abastecimento", "Rotina"],
+          ["/compras/prisma/mapa", "Mapa de dependências"],
           ["/compras/abastecimento/acordos", "Acordos"],
           ["/compras/abastecimento/cardapio", "Papel na marca"],
           ["/compras/abastecimento/matriz", "Matriz e cotações"],
@@ -169,9 +176,9 @@ export default function SupplyClient({ mode = "rotina" }: { mode?: Mode }) {
                       ? "Teto pendente"
                       : money(data.config.teto_caixa_7d)}
                   </strong>
-                  <a href="/compras/abastecimento/acordos">
+                  <Link href="/compras/abastecimento/acordos">
                     Conferir propostas →
-                  </a>
+                  </Link>
                 </article>
                 <article>
                   <small>O que chega?</small>
@@ -806,7 +813,7 @@ function AgreementForm({
           f.fornecedor_nome,
         ]),
     ).entries(),
-  ].filter(([r]) => r);
+  ].filter((entry): entry is [string, string | null] => entry[0] !== null);
   return (
     <details className="panel">
       <summary>Cadastrar ou editar proposta de acordo</summary>
@@ -929,7 +936,7 @@ function AgreementForm({
                         entrada: "entrada_divida_rs",
                         compra: "compra_nova_rs",
                         frete: "frete_rs",
-                      } as Record<string, string>
+                      } as Record<string, "entrada_divida_rs" | "compra_nova_rs" | "frete_rs">
                     )[n!]!
                   ] ?? 0
                 }
@@ -1145,10 +1152,10 @@ function Strategy({
           cadastradas:{" "}
           {data.papeis.filter((p) => p.papel === "assinatura").length}.
         </p>
-        <a href="/compras/abastecimento/acordos">Definir caixa e dono →</a>{" "}
-        <a href="/compras/abastecimento/cardapio">
+        <Link href="/compras/abastecimento/acordos">Definir caixa e dono →</Link>{" "}
+        <Link href="/compras/abastecimento/cardapio">
           Definir assinaturas com os chefs →
-        </a>
+        </Link>
       </section>
     </>
   );

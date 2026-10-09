@@ -1,6 +1,6 @@
 "use client";
 import { useAuth } from "@kph/auth/context";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { decidePonte, getPonte, searchFichas, type PonteData, type PonteRow, type FichaOption } from "./actions";
 import "./ponte.css";
@@ -14,17 +14,17 @@ export default function PonteClient({units}:{units:{id:string;name:string}[]}) {
   const [page,setPage]=useState(0);
   const [data,setData]=useState<PonteData|null>(null);
   const [error,setError]=useState("");
-  const [loading,setLoading]=useState(true);
+  const [loading,setLoading]=useState(!!unit);
   const [revision,setRevision]=useState(0);
   const [busy,setBusy]=useState<string|null>(null);
-  const request=useRef(0);
+  const requestKey=JSON.stringify([unit,status,search,page,revision]);
+  const [previousRequest,setPreviousRequest]=useState(requestKey);
+  if(previousRequest!==requestKey){setPreviousRequest(requestKey);setLoading(!!unit);setError("");setData(null);}
   useEffect(()=>{
-    const id=++request.current;
-    setData(null);
-    if(!unit){setLoading(false);return;}
-    setLoading(true);setError("");
-    const timer=setTimeout(()=>{getPonte(unit,status,search,page).then(d=>{if(id===request.current)setData(d);}).catch(e=>{if(id===request.current)setError(e.message);}).finally(()=>{if(id===request.current)setLoading(false);});},200);
-    return ()=>{clearTimeout(timer);request.current++;};
+    if(!unit)return;
+    let active=true;
+    const timer=setTimeout(()=>{getPonte(unit,status,search,page).then(d=>{if(active)setData(d);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});},200);
+    return ()=>{active=false;clearTimeout(timer);};
   },[unit,status,search,page,revision]);
   async function decide(row:PonteRow,next:string,ficha:string|null){
     setBusy(row.id);setError("");

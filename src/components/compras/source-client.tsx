@@ -121,17 +121,27 @@ export default function SourceClient({
     [saving, setSaving] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const sequence = useRef(0);
-  useEffect(() => {
+  const [previousUnit, setPreviousUnit] = useState(unit);
+  if (previousUnit !== unit) {
+    setPreviousUnit(unit);
     setPage(0);
     setData(null);
     setDetail(null);
+    setDetailUnit(null);
+  }
+  useEffect(() => {
     dialog.current?.close();
     sequence.current++;
   }, [unit]);
-  useEffect(() => {
-    let alive = true;
+  const requestKey = JSON.stringify([kind, unit, search, month, page]);
+  const [previousRequest, setPreviousRequest] = useState(requestKey);
+  if (previousRequest !== requestKey) {
+    setPreviousRequest(requestKey);
     setLoading(true);
     setError("");
+  }
+  useEffect(() => {
+    let alive = true;
     const timer = setTimeout(() => {
       getSource(kind, unit, search, month, page)
         .then((d) => {
@@ -172,12 +182,24 @@ export default function SourceClient({
     }
   }
   useEffect(() => {
-    if (initialId)
-      void open({
-        id: initialId,
-        nome: "Ficha técnica",
-      }); /* initial detail is scoped to selected unit */
-  }, [initialId]);
+    if (!initialId || !unit) return;
+    let active = true;
+    const seq = ++sequence.current;
+    dialog.current?.showModal();
+    getSourceDetail(kind, unit, initialId).then((d) => {
+      if (!active || seq !== sequence.current) return;
+      setDetailTitle("Ficha técnica");
+      setDetailUnit(unit);
+      setDetail(d);
+      setPrice(String(d.parent?.preco_venda ?? ""));
+      setCategory(String(d.parent?.categoria ?? ""));
+    }).catch((e: unknown) => {
+      if (!active || seq !== sequence.current) return;
+      setError(e instanceof Error ? e.message : "Falha na leitura.");
+      dialog.current?.close();
+    });
+    return () => { active = false; };
+  }, [initialId, kind, unit]);
   async function save() {
     if (!detail?.parent?.metadata_id || !detailUnit) return;
     setSaving(true);

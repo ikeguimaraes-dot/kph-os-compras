@@ -1,5 +1,6 @@
 "use client";
 import { useAuth } from "@kph/auth/context";
+import Link from "next/link";
 import { saveSupplierAlias } from "@/lib/compras/prisma-cockpit-actions";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -78,7 +79,7 @@ export default function PrismaClient({
   const [plan, setPlan] = useState<Plan[]>([]),
     [canGroup, setCanGroup] = useState(false),
     [anchors, setAnchors] = useState<Anchors | null>(null);
-  const [anchorLoading, setAnchorLoading] = useState(false),
+  const [anchorLoading, setAnchorLoading] = useState(initialTab === 2),
     [search, setSearch] = useState(""),
     [quadrant, setQuadrant] = useState("Todos");
   const [drawer, setDrawer] = useState<Drawer | null>(
@@ -86,26 +87,39 @@ export default function PrismaClient({
     ),
     [migration, setMigration] = useState(25),
     [refresh, setRefresh] = useState(0);
+  const anchorKey = JSON.stringify([tab, filter.unitId, refresh]);
+  const [previousAnchor, setPreviousAnchor] = useState(anchorKey);
+  if (previousAnchor !== anchorKey) {
+    setPreviousAnchor(anchorKey);
+    setAnchorLoading(tab === 2);
+  }
+  const [previousDrawer, setPreviousDrawer] = useState(drawer);
+  if (previousDrawer !== drawer) {
+    setPreviousDrawer(drawer);
+    setMigration(25);
+  }
   const modal = useRef<HTMLDialogElement>(null);
   const pendingRoot = useRef(initialRoot);
-  useEffect(() => {
+  const [previousHouse, setPreviousHouse] = useState(selectedHouse);
+  if (previousHouse !== selectedHouse) {
+    setPreviousHouse(selectedHouse);
     const unitId = selectedHouse === "all" ? null : selectedHouse;
-    setFilter((current) =>
-      current.unitId === unitId ? current : { ...current, unitId },
-    );
-    setDraft((current) =>
-      current.unitId === unitId ? current : { ...current, unitId },
-    );
+    setFilter((current) => current.unitId === unitId ? current : { ...current, unitId });
+    setDraft((current) => current.unitId === unitId ? current : { ...current, unitId });
     setData(null);
-  }, [selectedHouse]);
-  useEffect(() => {
-    let active = true;
+  }
+  const [previousRequest, setPreviousRequest] = useState({ filter, refresh });
+  if (previousRequest.filter !== filter || previousRequest.refresh !== refresh) {
+    setPreviousRequest({ filter, refresh });
     setLoading(true);
     setError("");
     setData(null);
     setAnchors(null);
     setDrawer(null);
     setPlan([]);
+  }
+  useEffect(() => {
+    let active = true;
     Promise.all([getPrisma(filter), listPrismaPlan(filter.unitId)])
       .then(([d, p]) => {
         if (active) {
@@ -131,7 +145,6 @@ export default function PrismaClient({
   useEffect(() => {
     if (tab !== 2) return;
     let active = true;
-    setAnchorLoading(true);
     getPrismaAnchors(filter.unitId)
       .then((a) => {
         if (active) setAnchors(a);
@@ -148,7 +161,6 @@ export default function PrismaClient({
   }, [tab, filter.unitId, refresh]);
   useEffect(() => {
     if (drawer) {
-      setMigration(25);
       modal.current?.showModal();
     } else modal.current?.close();
   }, [drawer]);
@@ -224,10 +236,10 @@ export default function PrismaClient({
   return (
     <article className="prisma">
       <nav className="prisma-breadcrumb" aria-label="Navegação de compras">
-        <a href="/compras">Compras</a>
+        <Link href="/compras">Compras</Link>
         <span>/</span>
-        <a href="/compras/prisma">Cockpit de margem</a>
-        <a href="/compras/recebimento">Conferir notas ↗</a>
+        <Link href="/compras/prisma">Cockpit de margem</Link>
+        <Link href="/compras/recebimento">Conferir notas ↗</Link>
       </nav>
       <header className="prisma-hero">
         <p className="prisma-eyebrow">GRUPO KPH · INTELIGÊNCIA DE COMPRAS</p>
