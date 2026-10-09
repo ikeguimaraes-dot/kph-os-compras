@@ -1,4 +1,6 @@
 "use server";
+import { requireUnitScope, parseUnitScope } from "./unit-scope";
+
 import { comprasAccess } from "./everest-access";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
@@ -29,7 +31,7 @@ export async function getSource(
   page = 0,
 ) {
   if (!(kind in views)) throw new Error("Fonte inválida.");
-  const { db, unitIds } = await comprasAccess(unit);
+  const { db, unitIds } = await comprasAccess(parseUnitScope(unit));
   z.number().int().min(0).max(10000).parse(page);
   let q = db
     .from(views[kind])
@@ -88,7 +90,8 @@ export async function getSourceDetail(
   unit: string,
   id: string,
 ) {
-  const { db } = await comprasAccess(unit);
+  unit = requireUnitScope(unit);
+  const { db } = await comprasAccess(unit, "write");
   z.uuid().parse(id);
   if (kind === "cardapio") {
     const parent = await db
@@ -194,7 +197,8 @@ export async function saveMenuMetadata(
   price: number,
   category: string,
 ) {
-  const { db } = await comprasAccess(unit);
+  unit = requireUnitScope(unit);
+  const { db } = await comprasAccess(unit, "write");
   z.uuid().parse(id);
   z.number().finite().min(0).max(100000).parse(price);
   z.string().trim().min(1).max(100).parse(category);

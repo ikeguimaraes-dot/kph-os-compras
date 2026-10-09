@@ -1,5 +1,6 @@
 "use client";
 import { useAuth } from "@kph/auth/context";
+import { resolveUnitScope } from "@/lib/compras/unit-scope";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -102,7 +103,7 @@ export default function SourceClient({
   initialId?: string;
 }) {
   const { unitId, setUnitId: setUnit } = useAuth();
-  const unit = unitId === "all" ? null : unitId;
+  const unit = resolveUnitScope(unitId, units.map((u) => u.id));
   const [detailUnit, setDetailUnit] = useState<string | null>(null);
   const [search, setSearch] = useState(""),
     [month, setMonth] = useState(""),

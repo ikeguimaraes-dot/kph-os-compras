@@ -1,4 +1,5 @@
 "use server";
+import { parseUnitScope } from "@/lib/compras/unit-scope";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
 import type { ActionResult } from "@/lib/result";
@@ -11,8 +12,9 @@ export async function listQuotes(unitId: string, mes?: number, ano?: number): Pr
   if (!supabase) return [];
   let query = (supabase.from("price_quotes" as never) as ReturnType<typeof supabase.from>)
     .select("*, suppliers(nome), price_quote_items(total)")
-    .eq("unit_id", unitId)
     .order("created_at", { ascending: false });
+  const unit = parseUnitScope(unitId);
+  if (unit) query = query.eq("unit_id", unit);
   if (mes && ano) {
     const start = `${ano}-${String(mes).padStart(2, "0")}-01`;
     query = query.eq("periodo", start);
@@ -30,8 +32,10 @@ export async function listQuotes(unitId: string, mes?: number, ano?: number): Pr
 export async function createQuote(input: Omit<PriceQuoteRow, "id" | "created_at" | "updated_at">): Promise<ActionResult<PriceQuoteRow>> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, error: "Supabase indisponível" };
+  const unit = parseUnitScope(input.unit_id);
+  if (!unit) return { ok: false, error: "Selecione uma casa específica para criar a cotação." };
   const result = await (supabase.from("price_quotes" as never) as ReturnType<typeof supabase.from>)
-    .insert(input as never).select().single();
+    .insert({ ...input, unit_id: unit } as never).select().single();
   const { data, error } = result as unknown as { data: PriceQuoteRow | null; error: { message: string } | null };
   if (error || !data) { console.error("[createQuote]", error?.message); return { ok: false, error: error?.message ?? "Falha" }; }
   revalidatePath("/compras/cotacoes");

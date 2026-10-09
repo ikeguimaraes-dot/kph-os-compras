@@ -1,4 +1,6 @@
 "use server";
+import { unitScope, parseUnitScope } from "./unit-scope";
+
 import { z } from "zod";
 import { supplierAction } from "./prisma-config";
 import { unstable_cache } from "next/cache";
@@ -12,7 +14,7 @@ import { analyzePrisma, type Line, type Term } from "./prisma-engine";
 
 const date = z.iso.date();
 const filterSchema = z
-  .object({ unitId: z.uuid().nullable(), start: date, end: date })
+  .object({ unitId: unitScope, start: date, end: date })
   .refine((v) => v.start <= v.end, "Período inválido.")
   .refine(
     (v) =>
@@ -195,7 +197,9 @@ export async function getPrismaAnchors(unitId: string | null) {
   };
 }
 export async function listPrismaPlan(unitId: string | null) {
-  const { db, unitIds } = await comprasAccess(unitId);
+  unitId = parseUnitScope(unitId);
+  const { db, unitIds, unitId: selectedUnit } = await comprasAccess(unitId);
+  unitId = selectedUnit;
   const canGroup = await groupPermission();
   let q = db
     .from("compras_plano_acao")
@@ -215,7 +219,8 @@ export async function addPrismaPlan(raw: {
   process?: boolean;
 }) {
   const filter = filterSchema.parse(raw.filter);
-  const { db, user } = await comprasAccess(filter.unitId);
+  const { db, user, unitId } = await comprasAccess(filter.unitId);
+  filter.unitId = unitId;
   if (!filter.unitId && !(await groupPermission()))
     throw new Error(
       "Plano do grupo exige acesso a todas as casas. Selecione uma casa.",

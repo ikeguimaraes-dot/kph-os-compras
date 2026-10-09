@@ -1,10 +1,11 @@
 // Schemas zod do módulo Compras.
 import { z } from "zod";
+import { requiredUnitScope } from "./unit-scope";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida");
 
 export const supplierSchema = z.object({
-  unit_id: z.string().uuid("unit_id obrigatório"),
+  unit_id: requiredUnitScope,
   brand_id: z.string().uuid("brand_id obrigatório"),
   nome: z.string().trim().min(1, "Nome obrigatório").max(160),
   cnpj: z.string().trim().max(20).optional().nullable(),
@@ -30,7 +31,7 @@ export const purchaseOrderItemSchema = z.object({
 export type PurchaseOrderItemValues = z.infer<typeof purchaseOrderItemSchema>;
 
 export const purchaseOrderCreateSchema = z.object({
-  unit_id: z.string().uuid(),
+  unit_id: requiredUnitScope,
   brand_id: z.string().uuid(),
   fornecedor: z.string().trim().max(160).optional().nullable(),
   supplier_id: z.string().uuid().optional().nullable(),
