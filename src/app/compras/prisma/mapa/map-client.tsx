@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import Mindmap from "./mindmap";
+import ParetoClient from "./pareto-client";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   getMapSupplierDetail,
@@ -140,6 +142,7 @@ export default function MapClient({
         "1": "dinheiro",
         "2": "dependencia",
         "3": "travados",
+        "4": "pareto",
       };
       if (v[e.key]) {
         e.preventDefault();
@@ -206,15 +209,15 @@ export default function MapClient({
         </div>
       </header>
       <div className="map-switch" role="group" aria-label="Visão do mapa">
-        {(["dinheiro", "dependencia", "travados"] as const).map((v, i) => (
+        {(["dinheiro", "dependencia", "travados", "pareto"] as const).map((v, i) => (
           <button
             key={v}
             aria-pressed={view === v}
             aria-keyshortcuts={String(i + 1)}
             onClick={() => setView(v)}
           >
-            <span aria-hidden="true">{["↝", "⌘", "⊘"][i]}</span>
-            {["Dinheiro", "Dependência", "Travados"][i]}
+            <span aria-hidden="true">{["↝", "⌘", "⊘", "▥"][i]}</span>
+            {["Dinheiro", "Dependência", "Travados", "Pareto"][i]}
             <kbd>{i + 1}</kbd>
           </button>
         ))}
@@ -291,6 +294,7 @@ export default function MapClient({
         <span>Anel = vencido / em aberto</span>
       </div>
       <section className="map-view" key={view} aria-label={`Visão ${view}`}>
+        {view === "pareto" && <ParetoClient unit={filters.unit} units={data.units} />}
         {view === "dinheiro" && (
           <>
             <div className="map-section-title">
@@ -372,6 +376,8 @@ export default function MapClient({
             </div>
             {chosen ? (
               <>
+                <Mindmap key={`${focus}:${filters.unit}`} edges={edges.filter(e => e.raiz_cnpj === focus)} allEdges={data.edges.filter(e => !filters.unit || e.unit_id === filters.unit)} blocks={blocks} supplier={chosen} units={data.units} names={names} today={data.today} reRoot={openFocus} openSupplier={openCard} />
+                <div className="mindmap-list">
                 <button className="map-root" onClick={() => openCard(focus)}>
                   <DebtRing supplier={chosen} />
                   <span>
@@ -386,6 +392,7 @@ export default function MapClient({
                   data={data}
                   names={names}
                 />
+                </div>
               </>
             ) : (
               <p className="map-empty">
