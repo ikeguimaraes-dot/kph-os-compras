@@ -1,3 +1,8 @@
+import { cookies } from "next/headers";
+import {
+  resolveUnitSelection,
+  UNIT_COOKIE,
+} from "../../../lib/kph/auth/unit-selection";
 import { AuthProvider } from "@kph/auth/context";
 import { requireUser } from "@kph/auth/server";
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
@@ -11,9 +16,13 @@ export default async function ComprasLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const user = await requireUser();
   const units = await loadAccessibleUnits();
+  const initialUnitId = resolveUnitSelection(
+    (await cookies()).get(UNIT_COOKIE)?.value,
+    units,
+  );
 
   return (
-    <AuthProvider user={user} units={units}>
+    <AuthProvider user={user} units={units} initialUnitId={initialUnitId}>
       <GhosShell>{children}</GhosShell>
     </AuthProvider>
   );

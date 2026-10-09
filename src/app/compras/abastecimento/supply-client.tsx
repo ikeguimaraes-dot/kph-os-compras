@@ -1,4 +1,5 @@
 "use client";
+import { useAuth } from "@kph/auth/context";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   getSupply,
@@ -26,8 +27,10 @@ const value = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const nullable = (f: FormData, k: string) => value(f, k) || null;
 const number = (f: FormData, k: string) => Number(f.get(k) ?? 0);
 export default function SupplyClient({ mode = "rotina" }: { mode?: Mode }) {
-  const [unit, setUnit] = useState<string | null>(null),
-    [data, setData] = useState<Data | null>(null),
+  const { unitId, setUnitId } = useAuth();
+  const unit = unitId === "all" ? null : unitId;
+  const setUnit = (id: string | null) => setUnitId(id ?? "all");
+  const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [revision, setRevision] = useState(0),

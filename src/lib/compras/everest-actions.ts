@@ -23,18 +23,18 @@ const views = {
 } as const;
 export async function getSource(
   kind: SourceKind,
-  unit: string,
+  unit: string | null,
   search = "",
   month = "",
   page = 0,
 ) {
   if (!(kind in views)) throw new Error("Fonte inválida.");
-  const { db } = await comprasAccess(unit);
+  const { db, unitIds } = await comprasAccess(unit);
   z.number().int().min(0).max(10000).parse(page);
   let q = db
     .from(views[kind])
     .select("*", { count: "exact" })
-    .eq("unit_id", unit);
+    .in("unit_id", unitIds);
   if (search.trim() && kind !== "analise")
     q = q.ilike("nome", `%${search.trim().slice(0, 100)}%`);
   if (month) {
@@ -57,14 +57,14 @@ export async function getSource(
       : kind === "recebimento" || kind === "estoque"
         ? q.order("data", { ascending: false }).order("id")
         : q.order("nome").order("id");
-  const { data, error, count } = await q.range(page * 50, page * 50 + 49);
+  const { data, error, count } = await q.order("unit_id").range(page * 50, page * 50 + 49);
   if (error) throw new Error(error.message);
   let totals: { notas: number; total: number } | null = null;
   if (kind === "recebimento" || kind === "analise") {
     let summary = db
       .from("v_compras_notas_resumo")
       .select("notas,total")
-      .eq("unit_id", unit);
+      .in("unit_id", unitIds);
     if (month) summary = summary.eq("mes", month + "-01");
     const result = await summary;
     if (result.error) throw new Error(result.error.message);
