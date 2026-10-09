@@ -1,5 +1,6 @@
 "use client";
 import { useAuth } from "@kph/auth/context";
+import { resolveUnitScope } from "@/lib/compras/unit-scope";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -341,7 +342,7 @@ export default function CockpitClient({
   const [previousHouse, setPreviousHouse] = useState(selectedHouse);
   if (previousHouse !== selectedHouse) {
     setPreviousHouse(selectedHouse);
-    const unitId = selectedHouse === "all" ? null : selectedHouse;
+    const unitId = resolveUnitScope(selectedHouse, units.map((u) => u.id));
     setFilter((current) => current.unitId === unitId ? current : { ...current, unitId });
     setDraft((current) => current.unitId === unitId ? current : { ...current, unitId });
     setData(null);

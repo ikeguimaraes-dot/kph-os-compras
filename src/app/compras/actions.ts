@@ -1,4 +1,5 @@
 "use server";
+import { parseUnitScope } from "@/lib/compras/unit-scope";
 
 // Server Actions do módulo Compras.
 //
@@ -48,7 +49,8 @@ export async function listSuppliers(unitId?: string | null): Promise<Supplier[]>
       .select("*")
       .order("ativo", { ascending: false })
       .order("nome", { ascending: true });
-    if (unitId) q = q.eq("unit_id", unitId);
+    const unit = parseUnitScope(unitId);
+    if (unit) q = q.eq("unit_id", unit);
     const { data, error } = await q;
     if (error) {
       console.error("[listSuppliers]", error.message);
@@ -208,7 +210,8 @@ export async function listPurchaseOrders(
         "*, brand:brands(name, color), unit:units(name), supplier:suppliers(nome), items:purchase_order_items(count)",
       )
       .order("created_at", { ascending: false });
-    if (unitId) q = q.eq("unit_id", unitId);
+    const unit = parseUnitScope(unitId);
+    if (unit) q = q.eq("unit_id", unit);
     const { data, error } = await q.returns<JoinRow[]>();
     if (error) {
       console.error("[listPurchaseOrders]", error.message);

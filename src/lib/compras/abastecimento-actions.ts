@@ -1,4 +1,6 @@
 "use server";
+import { requiredUnitScope, parseUnitScope } from "./unit-scope";
+
 import type { SupplyRows } from "./abastecimento-rows";
 import { z } from "zod";
 import { comprasAccess } from "./everest-access";
@@ -42,7 +44,7 @@ async function writeAccess(
     "head_financeiro",
   ],
 ) {
-  const a = await comprasAccess(unit);
+  const a = await comprasAccess(unit, "write");
   if (!role(a.user, roles, unit))
     throw new Error("Seu perfil não pode alterar este registro.");
   return a;
@@ -74,6 +76,7 @@ const today = () =>
     day: "2-digit",
   }).format(new Date());
 export async function getSupply(unit: string | null, mode: string = "rotina") {
+  unit = parseUnitScope(unit);
   z.enum(["rotina", "acordos", "cardapio", "estrategia"]).parse(mode);
   const { db, units, unitIds, user } = await comprasAccess(unit);
   const [
@@ -189,7 +192,7 @@ export async function saveSupply(raw: unknown) {
   const v = z
     .object({
       id: z.uuid(),
-      unit_id: z.uuid(),
+      unit_id: requiredUnitScope,
       version: text,
       produto_venda_ficha_id: z.uuid(),
       tipo: z.enum(TIPOS),
@@ -274,7 +277,7 @@ export async function saveSupply(raw: unknown) {
 }
 export async function confirmKitchen(raw: unknown) {
   const v = z
-    .object({ id: z.uuid(), unit: z.uuid(), version: text })
+    .object({ id: z.uuid(), unit: requiredUnitScope, version: text })
     .parse(raw);
   const { db, user } = await writeAccess(v.unit);
   const old = await db
@@ -335,7 +338,7 @@ export async function saveAgreement(raw: unknown) {
     .object({
       id: z.uuid().optional(),
       version: z.string().optional(),
-      unit_id: z.uuid(),
+      unit_id: requiredUnitScope,
       fornecedor_raiz: text,
       pratos_liberados: z.array(z.uuid()).min(1).max(100),
       entrada_divida_rs: z.number().min(0).max(1e9),
@@ -455,7 +458,7 @@ export async function saveAgreement(raw: unknown) {
 export async function saveDishRole(raw: unknown) {
   const v = z
     .object({
-      unit: z.uuid(),
+      unit: requiredUnitScope,
       prato: z.uuid(),
       papel: z.enum(["assinatura", "nucleo", "complemento"]),
     })
@@ -495,7 +498,7 @@ export async function saveDishRole(raw: unknown) {
 }
 export async function requestDishRemoval(raw: unknown) {
   const v = z
-    .object({ unit: z.uuid(), prato: z.uuid(), motivo: text })
+    .object({ unit: requiredUnitScope, prato: z.uuid(), motivo: text })
     .parse(raw);
   const { db } = await writeAccess(v.unit, [
     "founder",
@@ -521,7 +524,7 @@ export async function requestDishRemoval(raw: unknown) {
 export async function approveDishRemoval(raw: unknown) {
   const v = z
     .object({
-      unit: z.uuid(),
+      unit: requiredUnitScope,
       prato: z.uuid(),
       solicitacao: z.iso.datetime({ offset: true }),
     })

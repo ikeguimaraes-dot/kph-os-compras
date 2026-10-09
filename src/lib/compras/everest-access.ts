@@ -5,9 +5,12 @@ import {
 } from "@kph/db/supabase/server";
 import { requireUser } from "@kph/auth/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { z } from "zod";
+import { parseUnitScope } from "./unit-scope";
 
-export async function comprasAccess(unitId?: string | null) {
+export async function comprasAccess(input?: string | null, mode: "read" | "write" = "read") {
+  const unitId = parseUnitScope(input);
+  if (mode === "write" && input != null && !unitId)
+    throw new Error("Selecione a casa do registro antes de salvar.");
   const user = await requireUser();
   const session = await createSupabaseServerClient();
   const service = createServiceClient();
@@ -18,16 +21,9 @@ export async function comprasAccess(unitId?: string | null) {
     .from("units")
     .select("id,name")
     .order("name");
-  const active = await db
-    .from("everest_unidades")
-    .select("unit_id")
-    .eq("fora_do_escopo_cmv", false);
-  if (error || active.error)
-    throw new Error(error?.message ?? active.error?.message);
-  const ids = new Set((active.data ?? []).map((r) => r.unit_id));
+  if (error) throw new Error(error.message);
   const allowed: { id: string; name: string }[] = [];
   for (const unit of units ?? []) {
-    if (!ids.has(unit.id)) continue;
     const result = await scoped.rpc("kph_has_role_for_unit", {
       p_unit_id: unit.id,
     });
@@ -36,13 +32,13 @@ export async function comprasAccess(unitId?: string | null) {
   }
   if (!allowed.length) throw new Error("Nenhuma casa autorizada.");
   if (unitId) {
-    z.uuid().parse(unitId);
     if (!allowed.some((u) => u.id === unitId))
       throw new Error("Casa não autorizada.");
   }
   return {
     user,
     db,
+    unitId,
     units: allowed,
     unitIds: unitId ? [unitId] : allowed.map((u) => u.id),
   };

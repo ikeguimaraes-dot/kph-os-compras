@@ -1,4 +1,6 @@
 "use server";
+import { unitScope, requiredUnitScope } from "./unit-scope";
+
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { optionalPrismaQuery } from "./prisma-optional-query";
@@ -14,10 +16,6 @@ import {
   type PurchaseRow,
   type AlertRow,
 } from "./prisma-cockpit";
-const unitScope = z.preprocess(
-  (v) => (typeof v === "string" && !z.uuid().safeParse(v).success ? null : v),
-  z.uuid().nullable(),
-);
 const filterSchema = z.object({
   unitId: unitScope,
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/),
@@ -54,7 +52,8 @@ async function readRows<T>(
 }
 export async function getCockpit(raw: CockpitFilter) {
   const f = filterSchema.parse(raw);
-  const { db, user, units, unitIds } = await comprasAccess(f.unitId);
+  const { db, user, units, unitIds, unitId } = await comprasAccess(f.unitId);
+  f.unitId = unitId;
   const now = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
@@ -280,13 +279,13 @@ export async function saveCockpitTarget(raw: {
 }) {
   const v = z
     .object({
-      unitId: z.uuid(),
+      unitId: requiredUnitScope,
       month: filterSchema.shape.month,
       cmv: z.number().min(0).max(100).nullable(),
       savings: z.number().min(0).max(1e12).nullable(),
     })
     .parse(raw);
-  const { db, user } = await comprasAccess(v.unitId);
+  const { db, user } = await comprasAccess(v.unitId, "write");
   if (
     !user.roles.some(
       (r) =>
@@ -314,13 +313,13 @@ export async function saveOwnerTarget(raw: {
 }) {
   const v = z
     .object({
-      unitId: z.uuid(),
+      unitId: requiredUnitScope,
       month: filterSchema.shape.month,
       owner: z.string().trim().min(1).max(120),
       savings: z.number().min(0).max(1e12),
     })
     .parse(raw);
-  const { db, user } = await comprasAccess(v.unitId);
+  const { db, user } = await comprasAccess(v.unitId, "write");
   if (
     !user.roles.some(
       (r) =>
@@ -348,10 +347,10 @@ export async function saveSupplierAlias(raw: {
     .object({
       root: z.string().min(1).max(120),
       name: z.string().trim().min(1).max(120),
-      unitId: z.uuid().nullable(),
+      unitId: unitScope,
     })
     .parse(raw);
-  const { db, user, unitIds } = await comprasAccess(v.unitId);
+  const { db, user, unitIds } = await comprasAccess(v.unitId, "write");
   if (
     !user.roles.some(
       (r) =>
@@ -384,12 +383,12 @@ export async function addMenuPlan(raw: {
 }) {
   const v = z
     .object({
-      unitId: z.uuid(),
+      unitId: requiredUnitScope,
       month: filterSchema.shape.month,
       name: z.string().min(1).max(500),
     })
     .parse(raw);
-  const { db, user } = await comprasAccess(v.unitId);
+  const { db, user } = await comprasAccess(v.unitId, "write");
   const row = await db
     .from("mv_prisma_prato_mes")
     .select("nome,receita")

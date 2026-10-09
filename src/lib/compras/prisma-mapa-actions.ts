@@ -1,4 +1,6 @@
 "use server";
+import { unitScope, requiredUnitScope } from "./unit-scope";
+
 import { z } from "zod";
 import { comprasAccess } from "./everest-access";
 import { createServiceClient } from "@kph/db/supabase/server";
@@ -128,7 +130,7 @@ export async function getMapSupplierDetail(raw: {
   root: string;
   unit: string | null;
 }) {
-  const v = z.object({ root, unit: z.uuid().nullable() }).parse(raw);
+  const v = z.object({ root, unit: unitScope }).parse(raw);
   const { db, unitIds } = await comprasAccess(v.unit);
   const [credit, balance] = await Promise.all([
     db
@@ -186,8 +188,8 @@ export async function getMapSupplierDetail(raw: {
   return { credit: credit.data, profile, score };
 }
 export async function createMapAgreement(raw: { root: string; unit: string }) {
-  const v = z.object({ root, unit: z.uuid() }).parse(raw);
-  const { db, user } = await comprasAccess(v.unit);
+  const v = z.object({ root, unit: requiredUnitScope }).parse(raw);
+  const { db, user } = await comprasAccess(v.unit, "write");
   if (
     !user.roles.some(
       (r) =>

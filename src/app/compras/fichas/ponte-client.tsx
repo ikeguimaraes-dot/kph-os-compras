@@ -1,5 +1,6 @@
 "use client";
 import { useAuth } from "@kph/auth/context";
+import { resolveUnitScope } from "@/lib/compras/unit-scope";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { decidePonte, getPonte, searchFichas, type PonteData, type PonteRow, type FichaOption } from "./actions";
@@ -8,27 +9,26 @@ const money = (v: number) => Number(v).toLocaleString("pt-BR", {style:"currency"
 const pct = (a: number,b: number) => b ? 100*a/b : 0;
 export default function PonteClient({units}:{units:{id:string;name:string}[]}) {
   const {unitId, setUnitId: setUnit}=useAuth();
-  const unit=unitId === "all" ? "" : (unitId ?? "");
+  const unit=resolveUnitScope(unitId, units.map(u=>u.id)) ?? "";
   const [status,setStatus]=useState("pendente");
   const [search,setSearch]=useState("");
   const [page,setPage]=useState(0);
   const [data,setData]=useState<PonteData|null>(null);
   const [error,setError]=useState("");
-  const [loading,setLoading]=useState(!!unit);
+  const [loading,setLoading]=useState(true);
   const [revision,setRevision]=useState(0);
   const [busy,setBusy]=useState<string|null>(null);
   const requestKey=JSON.stringify([unit,status,search,page,revision]);
   const [previousRequest,setPreviousRequest]=useState(requestKey);
-  if(previousRequest!==requestKey){setPreviousRequest(requestKey);setLoading(!!unit);setError("");setData(null);}
+  if(previousRequest!==requestKey){setPreviousRequest(requestKey);setLoading(true);setError("");setData(null);}
   useEffect(()=>{
-    if(!unit)return;
     let active=true;
     const timer=setTimeout(()=>{getPonte(unit,status,search,page).then(d=>{if(active)setData(d);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});},200);
     return ()=>{active=false;clearTimeout(timer);};
   },[unit,status,search,page,revision]);
   async function decide(row:PonteRow,next:string,ficha:string|null){
     setBusy(row.id);setError("");
-    try{await decidePonte({id:row.id,unitId:unit,status:next,fichaId:ficha,version:row.atualizado_em});setRevision(v=>v+1);}
+    try{await decidePonte({id:row.id,unitId:row.unit_id,status:next,fichaId:ficha,version:row.atualizado_em});setRevision(v=>v+1);}
     catch(e){setError(e instanceof Error?e.message:"Não foi possível salvar.");}
     finally{setBusy(null);}
   }
@@ -39,8 +39,7 @@ export default function PonteClient({units}:{units:{id:string;name:string}[]}) {
     {data&&<section className="ponte-coverage" aria-label="Cobertura da receita"><div><strong>{pct(data.resolvida,data.total).toFixed(1)}%</strong><span> da receita revisada · meta 90%</span></div><progress max={100} value={pct(data.resolvida,data.total)} aria-label="Receita revisada"/><p>{pct(data.confirmada,data.total).toFixed(1)}% com ficha confirmada · {money(data.total)} de receita em 12 meses · {data.pendentes} pendentes</p><small>“Sem ficha” resolve a fila, mas não entra no cálculo de consumo teórico. A classificação de âncoras permanece provisória enquanto a cobertura for insuficiente.</small></section>}
     <nav className="ponte-tabs" aria-label="Situação dos pares">{[["pendente","Pendentes"],["confirmado","Confirmados"],["sem_ficha","Sem ficha"],["rejeitado","Rejeitados"]].map(([value,label])=><button key={value} aria-pressed={status===value} onClick={()=>{setStatus(value!);setPage(0);}}>{label}</button>)}</nav>
     {error&&<p role="alert" className="ponte-error">{error}</p>}
-    {!unit && <p role="status">Selecione uma casa para revisar os vínculos de fichas técnicas.</p>}
-    {loading?<p role="status">Carregando a fila…</p>:!data?.rows.length?<p>Nenhum produto nesta seleção.</p>:<div>{data.rows.map(row=><PonteCard key={row.id+row.atualizado_em} row={row} unit={unit} disabled={busy!==null} onDecide={(next,ficha)=>decide(row,next,ficha)} />)}</div>}
+    {loading?<p role="status">Carregando a fila…</p>:!data?.rows.length?<p>Nenhum produto nesta seleção.</p>:<div>{data.rows.map(row=><PonteCard key={row.id+row.atualizado_em} row={row} unit={row.unit_id} disabled={busy!==null} onDecide={(next,ficha)=>decide(row,next,ficha)} />)}</div>}
     <footer className="ponte-toolbar"><button disabled={loading||page===0} onClick={()=>setPage(p=>p-1)}>Anterior</button><span>Página {page+1} · {data?.count??0} produtos</span><button disabled={loading||(page+1)*40>=(data?.count??0)} onClick={()=>setPage(p=>p+1)}>Próxima</button></footer>
   </main>;
 }
