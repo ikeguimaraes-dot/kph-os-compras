@@ -107,7 +107,7 @@ export default function PrismaClient({
     const unitId = resolveUnitScope(selectedHouse, units.map((u) => u.id));
     setFilter((current) => current.unitId === unitId ? current : { ...current, unitId });
     setDraft((current) => current.unitId === unitId ? current : { ...current, unitId });
-    setData(null);
+    if (filter.unitId !== unitId) setData(null);
   }
   const [previousRequest, setPreviousRequest] = useState({ filter, refresh });
   if (previousRequest.filter !== filter || previousRequest.refresh !== refresh) {

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /** null representa todas as casas autorizadas, nunca ausência de autorização. */
 export function parseUnitScope(value: unknown): string | null {
-  return typeof value === "string" && z.uuid().safeParse(value).success ? value : null;
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) ? value : null;
 }
 export const unitScope = z.unknown().transform(parseUnitScope);
 
