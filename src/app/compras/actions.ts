@@ -16,6 +16,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
 import { requireUser } from "@kph/auth/server";
 import { createNotification } from "@/lib/notifications/actions";
+import { comprasAccess } from "@/lib/compras/everest-access";
 import type { ActionResult } from "@/lib/result";
 import {
   purchaseOrderCreateSchema,
@@ -299,44 +300,50 @@ export async function createPurchaseOrder(
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message ?? "Inválido" };
     }
-    const user = await requireUser();
-    const supabase = await createSupabaseServerClient();
-    if (!supabase) return { ok: false, error: "Supabase indisponível" };
-
-    // 1) cria o pedido (rascunho) — numero default via sequence
-    const orderPayload = {
-      unit_id: parsed.data.unit_id,
-      brand_id: parsed.data.brand_id,
-      fornecedor: parsed.data.fornecedor ?? null,
-      supplier_id: parsed.data.supplier_id ?? null,
-      data_pedido: parsed.data.data_pedido,
-      data_prevista: parsed.data.data_prevista ?? null,
-      observacoes: parsed.data.observacoes ?? null,
-      created_by: user.id,
-    };
-    const { data: order, error: oErr } = await supabase
-      .from(PO_TABLE)
-      .insert(orderPayload as never)
-      .select()
-      .single();
-    if (oErr || !order) return { ok: false, error: oErr?.message ?? "Falha" };
-
-    // 2) cria os items. trigger recalcula valor_total automaticamente.
-    const itemsPayload = parsed.data.items.map((it) => ({
-      order_id: (order as PurchaseOrder).id,
-      nome: it.nome,
-      unidade: it.unidade ?? null,
-      quantidade: it.quantidade,
-      preco_unitario: it.preco_unitario,
-    }));
-    const { error: iErr } = await supabase
-      .from(POI_TABLE)
-      .insert(itemsPayload as never);
-    if (iErr) {
-      // tenta limpar o pedido; falha silente é aceitável (RLS pode barrar)
-      await supabase.from(PO_TABLE).delete().eq("id", (order as PurchaseOrder).id);
-      return { ok: false, error: iErr.message };
+    const v = parsed.data;
+    const { db, user } = await comprasAccess(v.unit_id);
+    const roles = ["founder", "diretoria", "diretor", "comprador", "cfo", "head_financeiro"];
+    if (!user.roles.some((r) => roles.includes(r.role.toLowerCase()) && (r.unitId === null || r.unitId === v.unit_id)))
+      return { ok: false, error: "Seu perfil não pode criar pedidos nesta casa." };
+    const unit = await db.from("units").select("brand_id").eq("id", v.unit_id).single();
+    if (unit.error || unit.data.brand_id !== v.brand_id) return { ok: false, error: "Marca incompatível com a casa." };
+    let root = v.fornecedor_grupo ?? null;
+    let name = v.fornecedor ?? null;
+    if (v.supplier_id) {
+      const supplier = await db.from(SUP_TABLE).select("nome,cnpj,ativo,unit_id")
+        .eq("id", v.supplier_id).eq("unit_id", v.unit_id).single();
+      if (supplier.error || !supplier.data.ativo) return { ok: false, error: "Fornecedor inválido para a casa." };
+      name = supplier.data.nome;
+      const digits = (supplier.data.cnpj ?? "").replace(/\D/g, "");
+      const supplierRoot = digits.length === 14 ? digits.slice(0, 8) : digits.length === 11 ? digits : null;
+      if (supplierRoot) {
+        const group = await db.from("compras_fornecedor_grupo").select("grupo_id").eq("raiz_cnpj", supplierRoot).maybeSingle();
+        if (group.error) throw new Error(group.error.message);
+        const resolved = group.data?.grupo_id ?? supplierRoot;
+        if (root && root !== resolved) return { ok: false, error: "Grupo divergente do CNPJ cadastrado." };
+        root = resolved;
+      } else if (root) return { ok: false, error: "Fornecedor cadastrado sem CNPJ conciliável." };
     }
+    if (root) {
+      const group = await db.from("v_mapa_fornecedor").select("nome")
+        .eq("unit_id", v.unit_id).eq("raiz_cnpj", root).maybeSingle();
+      if (group.error || !group.data) return { ok: false, error: "Grupo fora da casa ou sem conciliação no mapa." };
+      name = group.data.nome;
+    }
+    if (!name?.trim()) return { ok: false, error: "Informe o fornecedor." };
+    const linked = [...new Set(v.items.flatMap((i) => i.insumo_id ? [i.insumo_id] : []))];
+    if (linked.length) {
+      if (!root) return { ok: false, error: "Selecione o grupo do fornecedor para vincular insumos." };
+      const valid = await db.from("v_mapa_share").select("item_id").eq("unit_id", v.unit_id)
+        .eq("raiz_cnpj", root).in("item_id", linked);
+      if (valid.error || new Set(valid.data?.map((i) => i.item_id)).size !== linked.length)
+        return { ok: false, error: "Insumo fora do fornecedor e da casa selecionados." };
+    }
+    const { data: order, error: oErr } = await db.rpc("compras_pedido_criar", {
+      p_input: { ...v, fornecedor: name, fornecedor_grupo: root, cobertura_dias: v.cobertura_dias ?? 7 },
+      p_user: user.id,
+    });
+    if (oErr || !order) return { ok: false, error: oErr?.message ?? "Falha ao criar pedido." };
 
     revalidatePath("/compras");
     return { ok: true, data: order as PurchaseOrder };
