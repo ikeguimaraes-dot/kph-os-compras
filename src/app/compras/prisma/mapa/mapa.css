@@ -250,6 +250,37 @@
   text-decoration: underline dotted #71806d;
   text-underline-offset: 4px;
 }
+.map-supplier-metrics {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px 14px;
+  margin: 14px 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.map-supplier-metric {
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  overflow-wrap: anywhere;
+  cursor: help;
+  text-decoration: underline dotted #71806d;
+  text-underline-offset: 4px;
+}
+.map-supplier-metric:last-child {
+  grid-column: 1 / -1;
+}
+.map-supplier-name {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}
 .map-root {
   border: 1px solid #655377;
   background: #272331;
@@ -667,9 +698,11 @@
   }
   .map-filters {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 12px;
   }
+  .map-filters label { min-width: 0; }
+  .map-filters select { min-width: 0; width: 100%; }
   .map-filters label:first-child {
     grid-column: 1/-1;
   }
@@ -740,3 +773,49 @@
     transition: none !important;
   }
 }
+
+/* Mind map uses native SVG/HTML; list remains the default below 1024px. */
+.mindmap-desktop { display: none; }
+.mindmap-tools { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.mindmap-tools p { flex: 1; color: #b1bda9; font-size: 12px; }
+.mindmap-tools button, .pareto-tabs button, .pareto-actions button { min-height: 44px; padding: 10px 14px; border: 1px solid #52634e; border-radius: 6px; color: #e8ebdf; background: #263324; cursor: pointer; }
+.mindmap-tools output { min-width: 48px; text-align: center; }
+.mindmap-viewport { position: relative; height: 680px; overflow: hidden; touch-action: none; border: 1px solid #354532; border-radius: 10px; background-color: #131c15; background-image: radial-gradient(#394334 1px, transparent 1px); background-size: 20px 20px; cursor: grab; }
+.mindmap-viewport:active { cursor: grabbing; }
+.mindmap-stage { position: absolute; transform-origin: 0 0; }
+.mindmap-links { position: absolute; inset: 0; pointer-events: none; }
+.mindmap-node { position: absolute; display: flex; flex-direction: column; gap: 10px; padding: 20px; color: #eee9df; text-align: left; border: 1px solid #485a42; border-radius: 12px; background: #1d2b20; font: 13px var(--map-sans), sans-serif; }
+.mindmap-node strong { font: 25px var(--map-serif), Georgia, serif; overflow-wrap: anywhere; }
+.mindmap-node small { color: #b4c2ad; font-size: 10px; }
+.mindmap-root { width: 260px; min-height: 160px; background: #2a2436; border-color: #806b9a; cursor: pointer; }
+.mindmap-item { width: 320px; padding: 0; overflow-y: auto; }
+.mindmap-item > button { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px; width: 100%; text-align: left; border: 0; background: none; color: inherit; cursor: pointer; }
+.mindmap-alternatives { display: flex; flex-direction: column; gap: 8px; padding: 0 20px 20px; }
+.mindmap-alternatives button { min-height: 44px; background: #2a2436; color: #d3c4ec; border: 1px solid #67547f; border-radius: 5px; padding: 8px; cursor: pointer; }
+.mindmap-dish { width: 340px; height: 190px; overflow-y: auto; border-left: 4px solid #89b893; cursor: pointer; }
+.mindmap-dish.blocked { border-left-color: #ed7778; }
+.pareto-tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+.pareto-tabs button[aria-pressed="true"] { background: #bdd0b9; color: #172019; }
+.pareto-formula { max-width: 850px; font-size: 12px; line-height: 1.7; color: #b4c0ad; }
+.pareto-economy { margin: 24px 0; padding: 22px; background: #203524; border: 1px solid #5a8059; border-radius: 10px; }
+.pareto-economy h3 { font-size: 27px; margin: 0; }
+.pareto-economy > div { display: flex; gap: 32px; flex-wrap: wrap; margin-top: 20px; }
+.pareto-economy strong { font-size: 25px; font-weight: 400; }
+.pareto-economy small { display: block; font-size: 11px; margin-top: 7px; color: #bccfb4; }
+.pareto-house { margin: 32px 0; padding-top: 20px; border-top: 1px solid #46513e; min-width: 0; }
+.pareto-house h3 { font-size: 28px; display: flex; justify-content: space-between; gap: 15px; flex-wrap: wrap; }
+.pareto-house h3 span { font-size: 23px; }
+.pareto-chart-scroll { width: 100%; overflow-x: auto; border: 1px solid #344532; border-radius: 8px; margin: 20px 0; }
+.pareto-row { border-bottom: 1px solid #354332; padding: 18px 0; }
+.pareto-row > div:first-child { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pareto-row p { font-size: 12px; color: #b9c5b2; line-height: 1.6; }
+.pareto-class { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 5px; background: #384035; }
+.band-A { background: #365a3b; } .band-B { background: #624e2e; }
+.pareto-track { height: 10px; border-radius: 3px; background: #293425; margin-top: 13px; overflow: hidden; }
+.pareto-track span { display: block; height: 100%; background: #89b893; }
+.pareto-actions { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.pareto-actions label { flex-direction: row; align-items: center; min-height: 44px; }
+.pareto-actions input { width: 20px; height: 20px; accent-color: #bdd0b9; }
+.pareto-actions button:disabled { opacity: .5; cursor: wait; }
+@media (min-width: 1024px) { .mindmap-desktop { display: block; } .mindmap-list { display: none; } }
+@media (max-width: 639px) { .map-switch button { font-size: 11px; gap: 3px; } .map-switch button > span { display: none; } .pareto-economy { padding: 16px; } .pareto-economy > div { gap: 20px; } }

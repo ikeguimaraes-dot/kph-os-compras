@@ -26,38 +26,45 @@ const today = () =>
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+const mapPageSize = 200;
+const loadMapPage = unstable_cache(
+  async (table: string, ids: string[], keys: string[], offset: number) => {
+    const service = createServiceClient();
+    if (!service) throw new Error("Base indisponível.");
+    const db = service as unknown as SupabaseClient;
+    let query = db.from(table).select("*").in("unit_id", ids);
+    for (const key of keys) query = query.order(key);
+    const result = await query.range(offset, offset + mapPageSize - 1);
+    if (result.error) throw new Error(result.error.message);
+    return result.data;
+  },
+  ["prisma-mapa-pages-v2"],
+  { revalidate: 60 },
+);
 async function all<T>(
-  db: SupabaseClient,
   table: string,
   ids: string[],
   keys: string[],
 ) {
   const rows: T[] = [];
-  for (let offset = 0; ; offset += 1000) {
-    let query = db.from(table).select("*").in("unit_id", ids);
-    for (const key of keys) query = query.order(key);
-    const r = await query.range(offset, offset + 999);
-    if (r.error) throw new Error(r.error.message);
-    rows.push(...(r.data as T[]));
-    if (r.data.length < 1000) return rows;
+  for (let offset = 0; ; offset += mapPageSize) {
+    const page = await loadMapPage(table, ids, keys, offset);
+    rows.push(...(page as T[]));
+    if (page.length < mapPageSize) return rows;
   }
 }
-const loadMap = unstable_cache(
-  async (ids: string[]) => {
-    const service = createServiceClient();
-    if (!service) throw new Error("Base indisponível.");
-    const db = service as unknown as SupabaseClient;
+async function loadMap(ids: string[]) {
     // Scope participates in the cache key. Never cache authentication decisions.
     const [edges, suppliers, titles, blocks] = await Promise.all([
-      all<MapEdge>(db, "v_mapa_aresta", ids, [
+      all<MapEdge>("v_mapa_aresta", ids, [
         "unit_id",
         "produto_venda_ficha_id",
         "insumo_id",
         "raiz_cnpj",
       ]),
-      all<MapSupplier>(db, "v_mapa_fornecedor", ids, ["unit_id", "raiz_cnpj"]),
-      all<MapTitle>(db, "v_mapa_titulo", ids, ["id"]),
-      all<MapBlock>(db, "v_mapa_86", ids, ["id"]),
+      all<MapSupplier>("v_mapa_fornecedor", ids, ["unit_id", "raiz_cnpj"]),
+      all<MapTitle>("v_mapa_titulo", ids, ["id"]),
+      all<MapBlock>("v_mapa_86", ids, ["id"]),
     ]);
     return {
       edges,
@@ -66,10 +73,7 @@ const loadMap = unstable_cache(
       blocks,
       readAt: new Date().toISOString(),
     };
-  },
-  ["prisma-mapa-v1"],
-  { revalidate: 60 },
-);
+}
 
 export async function getMap() {
   const { unitIds, units, user } = await comprasAccess();

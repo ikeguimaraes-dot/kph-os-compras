@@ -22,8 +22,8 @@ Dados (views novas, só leitura): v_pareto_prato, v_pareto_fornecedor, v_pareto_
 - Tudo com tooltip de fórmula e fonte; receita = Lorean, custo/compra = Everest; cmv_pct do Lorean proibido.
 
 ## Oráculos
-O1. Em cada aba, soma das barras = total da base (receita atribuída / gasto / compra) por casa; cortes A/B/C somam 100%.
-O2. Parrillada Carne aparece UMA vez na aba Fornecedores (grupo unificado), sem duplicar receita.
+O1. Em cada aba, a curva ABC fecha 100% da BASE CALCULÁVEL por casa (soma das barras = soma da base com valor calculável; cortes A/B/C somam 100% dessa base). Itens SEM base calculável (prato sem ficha confirmada ou sem preço, etc.) nunca somem nem entram como zero: ficam num grupo "sem base" visível, com contagem, % da receita Lorean que representam e aviso "confirme as fichas em /compras/fichas". Casa cuja base calculável é zero (ex.: Match Point hoje, 12 pontes de 555 produtos) mostra o aviso de base incompleta no lugar da curva — isso é comportamento CORRETO, não falha de oráculo.
+O2. Sem contagem dupla entre fornecedores: a soma da receita atribuída de TODOS os fornecedores (aba Fornecedores) = soma da base calculável dos pratos; conferir com a Parrillada Carne (PRATO multi-fornecedor): a soma dos pedaços atribuídos aos fornecedores dela = receita atribuível do prato, nunca mais. Grupos unificados (Popo, Specialli) aparecem UMA vez cada.
 O3. Um prato C com insumo exclusivo mostra economia = compra 12m desse insumo (conferir 1 caso real no banco).
 O4. Prato marcado assinatura grava na tabela e some da lista de cortáveis na hora.
 O5. Interruptor agora com 4 posições; teclas 1-4; ?view=pareto abre direto; filtros e fornecedor preservados ao alternar.

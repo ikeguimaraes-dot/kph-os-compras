@@ -1,5 +1,8 @@
 "use client";
 import Link from "next/link";
+import { supplierMetrics } from "@/lib/compras/supplier-metrics";
+import Mindmap from "./mindmap";
+import ParetoClient from "./pareto-client";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   getMapSupplierDetail,
@@ -63,6 +66,26 @@ function Metric({ children, source }: { children: ReactNode; source: string }) {
     >
       {children}
     </span>
+  );
+}
+function SupplierMetrics({ supplier }: { supplier: MapSupplier | undefined }) {
+  return (
+    <div
+      className="map-supplier-metrics"
+      aria-label="Compra, venda sustentada e alavanca anual"
+    >
+      {supplierMetrics(supplier).map((metric) => (
+        <span
+          key={metric.label}
+          className="map-supplier-metric"
+          title={metric.source}
+          tabIndex={0}
+          aria-label={`${metric.label}. ${metric.source}`}
+        >
+          {metric.label}
+        </span>
+      ))}
+    </div>
   );
 }
 function readFilters(p: Record<string, string>): MapFilters {
@@ -140,6 +163,7 @@ export default function MapClient({
         "1": "dinheiro",
         "2": "dependencia",
         "3": "travados",
+        "4": "pareto",
       };
       if (v[e.key]) {
         e.preventDefault();
@@ -206,15 +230,15 @@ export default function MapClient({
         </div>
       </header>
       <div className="map-switch" role="group" aria-label="Visão do mapa">
-        {(["dinheiro", "dependencia", "travados"] as const).map((v, i) => (
+        {(["dinheiro", "dependencia", "travados", "pareto"] as const).map((v, i) => (
           <button
             key={v}
             aria-pressed={view === v}
             aria-keyshortcuts={String(i + 1)}
             onClick={() => setView(v)}
           >
-            <span aria-hidden="true">{["↝", "⌘", "⊘"][i]}</span>
-            {["Dinheiro", "Dependência", "Travados"][i]}
+            <span aria-hidden="true">{["↝", "⌘", "⊘", "▥"][i]}</span>
+            {["Dinheiro", "Dependência", "Travados", "Pareto"][i]}
             <kbd>{i + 1}</kbd>
           </button>
         ))}
@@ -291,6 +315,7 @@ export default function MapClient({
         <span>Anel = vencido / em aberto</span>
       </div>
       <section className="map-view" key={view} aria-label={`Visão ${view}`}>
+        {view === "pareto" && <ParetoClient unit={filters.unit} units={data.units} />}
         {view === "dinheiro" && (
           <>
             <div className="map-section-title">
@@ -319,15 +344,11 @@ export default function MapClient({
                 </div>
                 <div className="map-mobile">
                   {flow.sources.map((s) => (
-                    <button
-                      className="map-supplier-bar"
-                      key={s.id}
-                      onClick={() => openFocus(s.id)}
-                    >
-                      <span>
-                        {names.get(s.id) ?? s.id}
-                        <b>{compact(s.value)}</b>
-                      </span>
+                    <div className="map-supplier-bar" key={s.id}>
+                      <button className="map-supplier-name" onClick={() => openFocus(s.id)}>
+                        {names.get(s.id) ?? s.id} ↗
+                      </button>
+                      <SupplierMetrics supplier={suppliers.find(v => v.raiz_cnpj === s.id)} />
                       <span
                         className="map-stacked"
                         style={{
@@ -345,7 +366,7 @@ export default function MapClient({
                             />
                           ))}
                       </span>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </>
@@ -372,6 +393,8 @@ export default function MapClient({
             </div>
             {chosen ? (
               <>
+                <Mindmap key={`${focus}:${filters.unit}`} edges={edges.filter(e => e.raiz_cnpj === focus)} allEdges={data.edges.filter(e => !filters.unit || e.unit_id === filters.unit)} blocks={blocks} supplier={chosen} units={data.units} names={names} today={data.today} reRoot={openFocus} openSupplier={openCard} />
+                <div className="mindmap-list">
                 <button className="map-root" onClick={() => openCard(focus)}>
                   <DebtRing supplier={chosen} />
                   <span>
@@ -386,6 +409,7 @@ export default function MapClient({
                   data={data}
                   names={names}
                 />
+                </div>
               </>
             ) : (
               <p className="map-empty">
@@ -590,9 +614,9 @@ function Sankey({
   setHover: (v: string | null) => void;
   open: (v: string) => void;
 }) {
-  const height = Math.max(650, flow.sources.length * 31 + 420),
+  const height = Math.max(650, flow.sources.length * 65 + 420),
     scale =
-      (height - 50 - Math.max(flow.sources.length, flow.targets.length) * 28) /
+      (height - 50 - Math.max(flow.sources.length, flow.targets.length) * 60) /
       flow.total;
   const sources = new Map<string, { y: number; offset: number }>(),
     targets = new Map<string, { y: number; offset: number }>();
@@ -600,23 +624,23 @@ function Sankey({
     ty = 28;
   for (const s of flow.sources) {
     sources.set(s.id, { y: sy, offset: 0 });
-    sy += s.value * scale + 28;
+    sy += s.value * scale + 60;
   }
   for (const t of flow.targets) {
     targets.set(t.id, { y: ty, offset: 0 });
-    ty += t.value * scale + 28;
+    ty += t.value * scale + 60;
   }
   return (
     <svg
       className="map-flow"
-      viewBox={`0 0 1120 ${height}`}
+      viewBox={`0 0 1420 ${height}`}
       role="group"
       aria-label="Fluxo fornecedor para prato, espessura proporcional à receita atribuída"
     >
       <text x="12" y="14" className="map-svg-caption">
         FORNECEDORES
       </text>
-      <text x="850" y="14" className="map-svg-caption">
+      <text x="1150" y="14" className="map-svg-caption">
         PRATOS · TOP 12 + OUTROS
       </text>
       {flow.links.map((l, i) => {
@@ -631,7 +655,7 @@ function Sankey({
         return (
           <path
             key={i}
-            d={`M 270 ${y1} C 520 ${y1}, 600 ${y2}, 835 ${y2}`}
+            d={`M 570 ${y1} C 720 ${y1}, 900 ${y2}, 1135 ${y2}`}
             strokeWidth={width}
             className={`map-flow-link ${l.color}`}
             opacity={
@@ -672,7 +696,7 @@ function Sankey({
             className="map-svg-node"
             tabIndex={0}
             role="button"
-            aria-label={`${names.get(s.id)}: ${brl(s.value)}. Abrir dependência.`}
+            aria-label={`${names.get(s.id)}. ${supplierMetrics(v).map(m => m.label).join(". ")}. Abrir dependência.`}
             onClick={() => open(s.id)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
@@ -695,7 +719,7 @@ function Sankey({
             <title>
               {amountSource} Vencido / em aberto: {pct(ratio)}.
             </title>
-            <rect x="260" y={y} width="10" height={h} rx="2" fill="#b5a0df" />
+            <rect x="560" y={y} width="10" height={h} rx="2" fill="#b5a0df" />
             <circle
               cx="17"
               cy={y + h / 2}
@@ -716,9 +740,14 @@ function Sankey({
             <text x="35" y={y + h / 2 - 3}>
               {(names.get(s.id) ?? s.id).slice(0, 26)}
             </text>
-            <text x="35" y={y + h / 2 + 13} className="map-svg-value">
-              {compact(s.value)}
-            </text>
+            {supplierMetrics(v).map((metric, index) => (
+              <text key={metric.label} x={index === 1 ? 270 : 35}
+                y={y + h / 2 + (index === 2 ? 33 : 15)} className="map-svg-value"
+                tabIndex={0} aria-label={`${metric.label}. ${metric.source}`}>
+                <title>{metric.source}</title>
+                {metric.label}
+              </text>
+            ))}
           </g>
         );
       })}
@@ -744,17 +773,17 @@ function Sankey({
           >
             <title>{amountSource}</title>
             <rect
-              x="835"
+              x="1135"
               y={y}
               width="7"
               height={t.value * scale}
               fill="#839087"
             />
-            <text x="853" y={y + (t.value * scale) / 2 - 3}>
+            <text x="1153" y={y + (t.value * scale) / 2 - 3}>
               {t.name.slice(0, 32)}
             </text>
             <text
-              x="853"
+              x="1153"
               y={y + (t.value * scale) / 2 + 13}
               className="map-svg-value"
             >
@@ -978,6 +1007,7 @@ function SupplierDrawer({
       </button>
       <p className="map-eyebrow">FICHA DO FORNECEDOR</p>
       <h2 id="map-supplier-title">{supplier?.nome ?? root}</h2>
+      <SupplierMetrics supplier={supplier} />
       <p>
         {filters.unit
           ? data.units.find((u) => u.id === filters.unit)?.name

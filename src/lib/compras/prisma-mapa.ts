@@ -1,6 +1,6 @@
 import { PRISMA } from "./prisma-config";
 
-export type MapView = "dinheiro" | "dependencia" | "travados";
+export type MapView = "dinheiro" | "dependencia" | "travados" | "pareto";
 export type MapPeriod = "12m" | "semana";
 export type MapEdge = {
   unit_id: string;
@@ -75,7 +75,7 @@ export type MapFilters = {
   noReserve: boolean;
 };
 export const mapView = (v: string | null | undefined): MapView =>
-  v === "dependencia" || v === "travados" ? v : "dinheiro";
+  v === "dependencia" || v === "travados" || v === "pareto" ? v : "dinheiro";
 export const edgeAmount = (e: MapEdge, period: MapPeriod): number | null => {
   if (e.peso_custo == null || e.share_fornecedor == null || e.receita_atribuida == null) return null;
   return period === "semana"
