@@ -10,7 +10,7 @@ export type ParetoSupplier = {
   receita_atribuida: number; vencido: number; boletos_mes: number; produto_dedicado: string | null;
 };
 export type ParetoIngredient = {
-  unit_id: string; insumo_id: string; nome: string; categoria: string | null;
+  unit_id: string; insumo_id: string | null; nome: string; categoria: string | null;
   unidade_medida: string | null; compra_12m: number; quantidade_12m: number;
   fornecedores: number; pratos: string[]; principal: string | null; volume_equalizavel: number;
   origens: { raiz_cnpj: string; compra_12m: number; quantidade_12m: number }[];

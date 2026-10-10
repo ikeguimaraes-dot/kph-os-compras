@@ -66,3 +66,44 @@ test("house without calculable attribution retains all products and 100% missing
   assert.equal(paretoCoverage(rows).share, 1);
   assert.equal(paretoCoverage([]).share, null);
 });
+
+// O2: supplier attribution sum equals dish attribution sum (no double-counting)
+test("supplier attribution sum equals dish attribution sum for multi-supplier dish (O2 conservation)", () => {
+  // Simulates Parrillada Carne: one dish served by two suppliers (60% + 40% split).
+  const dishRevenue = 1000;
+  const supplier1Revenue = 600;
+  const supplier2Revenue = 400;
+  const dishCurve = classifyPareto([{ id: "prato-parrillada", v: dishRevenue }], r => r.v, r => r.id);
+  assert.equal(dishCurve.total, dishRevenue);
+  const supplierCurve = classifyPareto(
+    [{ id: "raiz-forn-1", v: supplier1Revenue }, { id: "raiz-forn-2", v: supplier2Revenue }],
+    r => r.v, r => r.id
+  );
+  // Sum of supplier shares must equal the dish total, never more.
+  assert.equal(supplierCurve.total, dishRevenue);
+  assert.ok(supplierCurve.total <= dishCurve.total);
+  // Duplicate raiz would be caught by classifyPareto itself.
+  assert.throws(() => classifyPareto(
+    [{ id: "raiz-forn-1", v: 600 }, { id: "raiz-forn-1", v: 400 }],
+    r => r.v, r => r.id
+  ));
+});
+
+// O2: null-attributed multi-supplier dish stays out of ABC (Parrillada Carne case)
+test("multi-supplier dish with null attribution stays out of ABC and out of supplier curve", () => {
+  // Parrillada Carne has receita_atribuida = null in v_pareto_prato and v_mapa_aresta.
+  const rows = completeParetoDishes(
+    [dish("u", "parrillada", 5000, { receita_atribuida: null, atribuicao_completa: false })],
+    [{ id: "parrillada", unit_id: "u", nome_venda_original: "Parrillada Carne", receita_12m: 5000 }]
+  );
+  const curve = classifyPareto(rows, d => d.receita_atribuida, d => d.produto_id);
+  assert.equal(curve.total, 0);
+  assert.equal(curve.unknown.length, 1);
+  // Supplier side: two suppliers with null receita_atribuida both stay out of curve.
+  const supplierCurve = classifyPareto(
+    [{ id: "forn-1", v: null }, { id: "forn-2", v: null }],
+    r => r.v, r => r.id
+  );
+  assert.equal(supplierCurve.total, 0);
+  assert.equal(supplierCurve.unknown.length, 2);
+});
