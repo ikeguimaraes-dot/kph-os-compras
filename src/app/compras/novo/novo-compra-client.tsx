@@ -124,7 +124,10 @@ export function NovoCompraClient({ unitId, unitName, brandId, suppliers, groups 
           <div className="pedido-section-head"><strong>Item {idx + 1}</strong><button type="button" disabled={pending} aria-label={`Remover item ${idx + 1}`} onClick={() => { setItems((rows) => rows.filter((r) => r.key !== row.key)); setConfirmation(""); }}>Remover</button></div>
           <fieldset disabled={pending} className="pedido-fields">
             <label>Insumo Everest<select value={row.insumo_id} onChange={(e) => linkItem(row.key, e.target.value)}>
-              <option value="">Item livre · sem ficha vinculada</option>{context?.items.map((i) => <option key={i.id} value={i.id}>{i.descricao}</option>)}
+              <option value="">Item livre · sem ficha vinculada</option>{context?.items.map((i) => {
+                const em85 = i.qtd_minima !== null && i.stock?.quantidade != null && i.stock.quantidade < i.qtd_minima;
+                return <option key={i.id} value={i.id}>{em85 ? "[85] " : ""}{i.descricao}</option>;
+              })}
             </select></label>
             {!item && <label>Descrição<input value={row.nome} onChange={(e) => update(row.key, { nome: e.target.value })} required /></label>}
             <label>Unidade de compra<input value={row.unidade} onChange={(e) => update(row.key, { unidade: e.target.value })} required placeholder="kg, caixa…" /></label>
@@ -152,9 +155,38 @@ export function NovoCompraClient({ unitId, unitName, brandId, suppliers, groups 
 function Metric({ title, value, source }: { title: string; value: string; source: string }) {
   return <div tabIndex={0} title={source}><small>{title}</small><strong>{value}</strong><details><summary>Fonte e cálculo</summary>{source}</details></div>;
 }
+function Selo85({ item }: { item: PedidoItem }) {
+  if (item.qtd_minima === null) return null;
+  const qtd = item.stock?.quantidade ?? null;
+  if (qtd === null || qtd >= item.qtd_minima) return null;
+  return (
+    <span
+      className="pedido-85"
+      title={`Abaixo do mínimo cadastrado (${number(qtd)} de ${number(item.qtd_minima)} ${item.unidade_medida ?? "un."})`}
+      style={{
+        background: "#fef3c7",
+        color: "#92400e",
+        border: "1px solid #fbbf24",
+        borderRadius: "0.25rem",
+        padding: "0.1rem 0.4rem",
+        fontSize: "0.7rem",
+        fontWeight: 700,
+        marginLeft: "0.3rem",
+      }}
+    >
+      85
+    </span>
+  );
+}
+
 function ItemContext({ item }: { item: PedidoItem }) {
   return <div className="pedido-context"><div>
-    <strong>Estoque: {number(item.stock?.quantidade)} {item.unidade_medida}</strong>
+    <strong>Estoque: {number(item.stock?.quantidade)} {item.unidade_medida}<Selo85 item={item} /></strong>
+    {item.qtd_minima !== null && (
+      <p style={{ fontSize: "0.82em", color: "var(--muted)" }}>
+        Mínimo cadastrado: {number(item.qtd_minima)} {item.unidade_medida ?? "un."}
+      </p>
+    )}
     {item.stock ? <><p>Posição de {dateLabel(item.stock.posicao_de)}{item.stock.posicao_de !== item.stock.posicao_ate && ` a ${dateLabel(item.stock.posicao_ate)}`} · snapshot de inventário</p>
       <details><summary>Fonte e depósitos</summary><p>{item.stock.fonte} · última contagem encerrada por depósito; soma das quantidades convertidas.</p>{item.stock.posicoes.map((p, i) => <p key={i}>{p.deposito}: {number(p.quantidade)} · {dateLabel(p.dia)}</p>)}</details></>
       : <p>Sem posição Everest conhecida.</p>}

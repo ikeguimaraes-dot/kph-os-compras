@@ -16,6 +16,7 @@ export type PedidoConsumption = {
 export type PedidoItem = {
   id: string; descricao: string; unidade_medida: string | null;
   stock: PedidoStock | null; consumption: PedidoConsumption[]; desbloqueia: string[];
+  qtd_minima: number | null;
 };
 export type PedidoContext = { credit: PedidoCredit | null; items: PedidoItem[]; readAt: string };
 export const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];

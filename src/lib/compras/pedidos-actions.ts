@@ -62,13 +62,37 @@ export async function getPedidoContext(raw: { unit: string; root: string }): Pro
     if (r.error) throw new Error(r.error.message);
     catalog.push(...r.data);
   }
+  // Estoque mínimo para a casa (85)
+  const minimoRows: { insumo_id: string; qtd_minima: number }[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const r = await db.from("compras_estoque_minimo").select("insumo_id,qtd_minima").eq("unit_id", v.unit).range(offset, offset + 999);
+    if (r.error) break;
+    minimoRows.push(...r.data);
+    if (r.data.length < 1000) break;
+  }
+  const minimoMap = new Map(minimoRows.map((m) => [m.insumo_id, m.qtd_minima]));
+
+  const itemsRaw = catalog.sort((a, b) => a.descricao.localeCompare(b.descricao, "pt-BR")).map((item) => {
+    const days = consumption.filter((c) => c.insumo_id === item.id);
+    const dishes = new Set(days.flatMap((d) => d.pratos.map((p) => p.produto_id)));
+    const stock = stocks.find((s) => s.item_id === item.id) ?? null;
+    const qtd_minima = minimoMap.get(item.id) ?? null;
+    return { ...item, stock, consumption: days, qtd_minima,
+      desbloqueia: [...new Set(blocks.filter((b) => dishes.has(b.prato_id)).map((b) => b.nome))] };
+  });
+
+  // Itens em 85 sobem na ordenação
+  const is85 = (i: typeof itemsRaw[0]) =>
+    i.qtd_minima !== null && i.stock?.quantidade != null && i.stock.quantidade < i.qtd_minima;
+  const sorted = [...itemsRaw].sort((a, b) => {
+    const a85 = is85(a) ? 0 : 1;
+    const b85 = is85(b) ? 0 : 1;
+    if (a85 !== b85) return a85 - b85;
+    return a.descricao.localeCompare(b.descricao, "pt-BR");
+  });
+
   return {
     credit: credit.data as PedidoCredit, readAt: new Date().toISOString(),
-    items: catalog.sort((a, b) => a.descricao.localeCompare(b.descricao, "pt-BR")).map((item) => {
-      const days = consumption.filter((c) => c.insumo_id === item.id);
-      const dishes = new Set(days.flatMap((d) => d.pratos.map((p) => p.produto_id)));
-      return { ...item, stock: stocks.find((s) => s.item_id === item.id) ?? null, consumption: days,
-        desbloqueia: [...new Set(blocks.filter((b) => dishes.has(b.prato_id)).map((b) => b.nome))] };
-    }),
+    items: sorted,
   };
 }

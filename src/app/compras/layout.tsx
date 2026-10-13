@@ -5,7 +5,7 @@ import {
 } from "../../../lib/kph/auth/unit-selection";
 import { AuthProvider } from "@kph/auth/context";
 import { requireUser } from "@kph/auth/server";
-import { createSupabaseServerClient } from "@kph/db/supabase/server";
+import { createSupabaseServerClient, createServiceClient } from "@kph/db/supabase/server";
 import type { Unit } from "@kph/db/types/database";
 import { GhosShell } from "@/components/ghos/GhosShell";
 
@@ -20,12 +20,24 @@ export default async function ComprasLayout({
     (await cookies()).get(UNIT_COOKIE)?.value,
     units,
   );
+  const badge86 = await load86Count();
 
   return (
     <AuthProvider user={user} units={units} initialUnitId={initialUnitId}>
-      <GhosShell>{children}</GhosShell>
+      <GhosShell badge86={badge86}>{children}</GhosShell>
     </AuthProvider>
   );
+}
+
+async function load86Count(): Promise<number | undefined> {
+  try {
+    const service = createServiceClient();
+    if (!service) return undefined;
+    const { count } = await service.from("v_86_episodio").select("unit_id", { count: "exact", head: true }).is("saida_at", null);
+    return count ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function loadAccessibleUnits(): Promise<Unit[]> {
