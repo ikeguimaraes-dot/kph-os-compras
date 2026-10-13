@@ -1,4 +1,8 @@
-import SourcePage from "@/components/compras/source-page";
+import { comprasAccess } from "@/lib/compras/everest-access";
+import EstoqueTabs from "./estoque-tabs";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export default function Page(){return <SourcePage kind="estoque"/>;}
+export default async function Page() {
+  const { units } = await comprasAccess();
+  return <EstoqueTabs units={units} />;
+}
