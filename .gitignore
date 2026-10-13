@@ -2,6 +2,7 @@
 out/
 build/
 node_modules/
+.worktrees/
 /node_modules
 /docs/PRISMA-MAPA-VALIDACAO.md
 /docs/prisma-mapa-evidencias/
