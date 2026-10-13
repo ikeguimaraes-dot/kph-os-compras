@@ -819,3 +819,9 @@
 .pareto-actions button:disabled { opacity: .5; cursor: wait; }
 @media (min-width: 1024px) { .mindmap-desktop { display: block; } .mindmap-list { display: none; } }
 @media (max-width: 639px) { .map-switch button { font-size: 11px; gap: 3px; } .map-switch button > span { display: none; } .pareto-economy { padding: 16px; } .pareto-economy > div { gap: 20px; } }
+.map-legend-stage {
+  font-size: 11px;
+  color: #99ab9d;
+  margin: 12px 0 0;
+  line-height: 1.6;
+}

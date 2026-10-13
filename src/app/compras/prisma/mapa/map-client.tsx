@@ -320,10 +320,7 @@ export default function MapClient({
           <>
             <div className="map-section-title">
               <h2>O fluxo da receita.</h2>
-              <p>
-                Mais largo, mais receita atribuída. Toque no fornecedor para
-                seguir o caminho.
-              </p>
+              <p>Mais largo, mais valor. Toque no fornecedor para seguir o caminho completo.</p>
             </div>
             {!flow.sources.length ? (
               <p className="map-empty">
@@ -340,8 +337,15 @@ export default function MapClient({
                     hover={hover}
                     setHover={setHover}
                     open={openFocus}
+                    unitSuppliers={data.suppliers.filter(
+                      (s) => !filters.unit || s.unit_id === filters.unit,
+                    )}
+                    units={data.units}
                   />
                 </div>
+                <p className="map-legend-stage">
+                  Espessura 1ª coluna = compra CMV (R$/ano) · Espessura 2ª coluna = receita atribuída (R$/ano)
+                </p>
                 <div className="map-mobile">
                   {flow.sources.map((s) => (
                     <div className="map-supplier-bar" key={s.id}>
@@ -606,6 +610,8 @@ function Sankey({
   hover,
   setHover,
   open,
+  unitSuppliers,
+  units,
 }: {
   flow: ReturnType<typeof buildFlow>;
   suppliers: MapSupplier[];
@@ -613,56 +619,220 @@ function Sankey({
   hover: string | null;
   setHover: (v: string | null) => void;
   open: (v: string) => void;
+  unitSuppliers: MapSupplier[];
+  units: { id: string; name: string }[];
 }) {
-  const height = Math.max(650, flow.sources.length * 65 + 420),
-    scale =
-      (height - 50 - Math.max(flow.sources.length, flow.targets.length) * 60) /
-      flow.total;
-  const sources = new Map<string, { y: number; offset: number }>(),
-    targets = new Map<string, { y: number; offset: number }>();
-  let sy = 28,
-    ty = 28;
+  // IDs dos fornecedores que aparecem no flow (têm receita atribuída)
+  const flowSupplierIds = new Set(flow.sources.map((s) => s.id));
+
+  // Para cada (unit_id, raiz_cnpj) que aparece no flow, registrar o gasto
+  const houseSuppliersSpend = new Map<
+    string,
+    { unit_id: string; raiz_cnpj: string; value: number }[]
+  >();
+  for (const s of unitSuppliers) {
+    if (!flowSupplierIds.has(s.raiz_cnpj)) continue;
+    const key = s.unit_id;
+    const arr = houseSuppliersSpend.get(key) ?? [];
+    const existing = arr.find((x) => x.raiz_cnpj === s.raiz_cnpj);
+    if (existing) existing.value += Number(s.gasto_12m);
+    else arr.push({ unit_id: s.unit_id, raiz_cnpj: s.raiz_cnpj, value: Number(s.gasto_12m) });
+    houseSuppliersSpend.set(key, arr);
+  }
+
+  // Total por casa (apenas fornecedores no flow)
+  const houseTotals = new Map<string, number>();
+  for (const [unitId, items] of houseSuppliersSpend) {
+    houseTotals.set(unitId, items.reduce((s, x) => s + x.value, 0));
+  }
+
+  // Array plano de links S1 (para cada casa, na ordem dos flow.sources)
+  const houseLinksArr: { unit_id: string; raiz_cnpj: string; value: number }[] = [];
+  for (const [, items] of houseSuppliersSpend) {
+    const ordered = flow.sources
+      .filter((s) => items.some((x) => x.raiz_cnpj === s.id))
+      .map((s) => items.find((x) => x.raiz_cnpj === s.id)!);
+    houseLinksArr.push(...ordered);
+  }
+
+  // supplierToHousesMap: raiz_cnpj → Set<unit_id>
+  const supplierToHousesMap = new Map<string, Set<string>>();
+  for (const l of houseLinksArr) {
+    const set = supplierToHousesMap.get(l.raiz_cnpj) ?? new Set<string>();
+    set.add(l.unit_id);
+    supplierToHousesMap.set(l.raiz_cnpj, set);
+  }
+
+  const nHouses = houseTotals.size;
+  const totalHouseSpend = [...houseTotals.values()].reduce((a, b) => a + b, 0);
+  const height = Math.max(
+    650,
+    Math.max(nHouses, flow.sources.length, flow.targets.length) * 65 + 420,
+  );
+  // Scale S2 (fornecedor→prato)
+  const scaleS2 =
+    (height - 50 - Math.max(flow.sources.length, flow.targets.length) * 60) /
+    flow.total;
+  // Scale S1 (casa→fornecedor): proporcional ao gasto
+  const scaleS1 =
+    totalHouseSpend > 0
+      ? (height - 50 - Math.max(nHouses, flow.sources.length) * 60) /
+        totalHouseSpend
+      : scaleS2;
+
+  // Casas ordenadas por gasto decrescente
+  const houseOrder = [...houseTotals.entries()].sort((a, b) => b[1] - a[1]);
+  const houseYMap = new Map<string, { y: number; offset: number }>();
+  let hy = 28;
+  for (const [unitId, total] of houseOrder) {
+    houseYMap.set(unitId, { y: hy, offset: 0 });
+    hy += total * scaleS1 + 60;
+  }
+
+  // Fornecedores
+  const sourcesLayout = new Map<string, { y: number; offset: number }>();
+  let sy = 28;
   for (const s of flow.sources) {
-    sources.set(s.id, { y: sy, offset: 0 });
-    sy += s.value * scale + 60;
+    sourcesLayout.set(s.id, { y: sy, offset: 0 });
+    sy += s.value * scaleS2 + 60;
   }
+
+  // Pratos
+  const targetsLayout = new Map<string, { y: number; offset: number }>();
+  let ty = 28;
   for (const t of flow.targets) {
-    targets.set(t.id, { y: ty, offset: 0 });
-    ty += t.value * scale + 60;
+    targetsLayout.set(t.id, { y: ty, offset: 0 });
+    ty += t.value * scaleS2 + 60;
   }
+
+  // Hover de 3 estágios
+  let activeHouses: Set<string> | null = null;
+  let activeSuppliers: Set<string> | null = null;
+  let activeDishes: Set<string> | null = null;
+
+  if (hover) {
+    activeHouses = new Set<string>();
+    activeSuppliers = new Set<string>();
+    activeDishes = new Set<string>();
+
+    if (houseTotals.has(hover)) {
+      // hover = casa
+      activeHouses.add(hover);
+      for (const l of houseLinksArr) {
+        if (l.unit_id === hover) activeSuppliers.add(l.raiz_cnpj);
+      }
+    } else if (flowSupplierIds.has(hover)) {
+      // hover = fornecedor
+      activeSuppliers.add(hover);
+      for (const h of supplierToHousesMap.get(hover) ?? new Set<string>()) {
+        activeHouses.add(h);
+      }
+    } else {
+      // hover = prato
+      activeDishes.add(hover);
+      for (const l of flow.links) {
+        if (l.target === hover) {
+          activeSuppliers.add(l.source);
+          for (const h of supplierToHousesMap.get(l.source) ?? new Set<string>()) {
+            activeHouses.add(h);
+          }
+        }
+      }
+    }
+    // Propagar fornecedores → pratos
+    for (const s of activeSuppliers) {
+      for (const l of flow.links) {
+        if (l.source === s) activeDishes.add(l.target);
+      }
+    }
+  }
+
+  const nodeOp = (id: string, active: Set<string> | null) =>
+    !hover ? 1 : active?.has(id) ? 1 : 0.08;
+  const s1Op = (uid: string, rcnpj: string) =>
+    !hover ? 0.6 : activeHouses?.has(uid) && activeSuppliers?.has(rcnpj) ? 0.6 : 0.08;
+  const s2Op = (src: string, tgt: string) =>
+    !hover ? 0.6 : activeSuppliers?.has(src) && activeDishes?.has(tgt) ? 0.6 : 0.08;
+
+  // Offsets para links S1 (cópia para não mutar houseYMap/sourcesLayout durante render)
+  const houseOffsets = new Map(
+    [...houseYMap.entries()].map(([k, v]) => [k, { y: v.y, offset: 0 }]),
+  );
+  const sourceOffsetsS1 = new Map(
+    flow.sources.map((s) => [s.id, { y: sourcesLayout.get(s.id)!.y, offset: 0 }]),
+  );
+
+  // Offsets para links S2 (cópia de sourcesLayout/targetsLayout)
+  const sourceOffsetsS2 = new Map(
+    flow.sources.map((s) => [s.id, { y: sourcesLayout.get(s.id)!.y, offset: 0 }]),
+  );
+  const targetOffsetsS2 = new Map(
+    flow.targets.map((t) => [t.id, { y: targetsLayout.get(t.id)!.y, offset: 0 }]),
+  );
+
+  // Pré-computado para evitar O(n²) no tooltip dos links S2
+  const targetNameMap = new Map(flow.targets.map((t) => [t.id, t.name]));
+
   return (
     <svg
       className="map-flow"
-      viewBox={`0 0 1420 ${height}`}
+      viewBox={`0 0 1800 ${height}`}
       role="group"
-      aria-label="Fluxo fornecedor para prato, espessura proporcional à receita atribuída"
+      aria-label="Fluxo casas para fornecedores para pratos, espessura proporcional ao gasto e receita atribuída"
     >
       <text x="12" y="14" className="map-svg-caption">
-        R$ QUE ENTRA · FORNECEDORES
+        R$ QUE SAI DO CAIXA · CASAS
       </text>
-      <text x="1150" y="14" className="map-svg-caption">
+      <text x="680" y="14" className="map-svg-caption">
+        FORNECEDORES
+      </text>
+      <text x="1460" y="14" className="map-svg-caption">
         VIRA VENDA · PRATOS
       </text>
-      {flow.links.map((l, i) => {
-        const s = sources.get(l.source)!,
-          t = targets.get(l.target)!,
-          width = l.value * scale,
-          y1 = s.y + s.offset + width / 2,
-          y2 = t.y + t.offset + width / 2;
+
+      {/* Links S1: casas → fornecedores */}
+      {houseLinksArr.map((l) => {
+        const h = houseOffsets.get(l.unit_id)!;
+        const s = sourceOffsetsS1.get(l.raiz_cnpj)!;
+        const width = l.value * scaleS1;
+        const y1 = h.y + h.offset + width / 2;
+        const y2 = s.y + s.offset + width / 2;
+        h.offset += width;
         s.offset += width;
-        t.offset += width;
-        const label = `${names.get(l.source)} → ${flow.targets.find((t) => t.id === l.target)?.name}: ${brl(l.value)}. ${amountSource}`;
         return (
           <path
-            key={i}
-            d={`M 570 ${y1} C 720 ${y1}, 900 ${y2}, 1135 ${y2}`}
+            key={`s1-${l.unit_id}-${l.raiz_cnpj}`}
+            d={`M 90 ${y1} C 330 ${y1}, 590 ${y2}, 762 ${y2}`}
+            strokeWidth={width}
+            className="map-flow-link green"
+            opacity={s1Op(l.unit_id, l.raiz_cnpj)}
+            onMouseEnter={() => setHover(l.unit_id)}
+            onMouseLeave={() => setHover(null)}
+            onFocus={() => setHover(l.unit_id)}
+            onBlur={() => setHover(null)}
+          >
+            <title>{`${units.find((u) => u.id === l.unit_id)?.name ?? l.unit_id} → ${names.get(l.raiz_cnpj) ?? l.raiz_cnpj}: ${compact(l.value)}/ano CMV`}</title>
+          </path>
+        );
+      })}
+
+      {/* Links S2: fornecedores → pratos */}
+      {flow.links.map((l, i) => {
+        const s = sourceOffsetsS2.get(l.source)!;
+        const t = targetOffsetsS2.get(l.target)!;
+        const width = l.value * scaleS2;
+        const y1 = s.y + s.offset + width / 2;
+        const y2 = t.y + t.offset + width / 2;
+        s.offset += width;
+        t.offset += width;
+        const label = `${names.get(l.source)} → ${targetNameMap.get(l.target) ?? l.target}: ${brl(l.value)}. ${amountSource}`;
+        return (
+          <path
+            key={`s2-${i}`}
+            d={`M 774 ${y1} C 1000 ${y1}, 1200 ${y2}, 1450 ${y2}`}
             strokeWidth={width}
             className={`map-flow-link ${l.color}`}
-            opacity={
-              hover && hover !== l.source && hover !== l.target?.toString()
-                ? 0.08
-                : 0.6
-            }
+            opacity={s2Op(l.source, l.target?.toString())}
             tabIndex={0}
             role="button"
             aria-label={label}
@@ -682,28 +852,65 @@ function Sankey({
           </path>
         );
       })}
+
+      {/* Nós de CASAS */}
+      {houseOrder.map(([unitId, total]) => {
+        const layout = houseYMap.get(unitId)!;
+        const h = total * scaleS1;
+        const unitName = units.find((u) => u.id === unitId)?.name ?? unitId;
+        return (
+          <g
+            key={unitId}
+            className="map-svg-node"
+            tabIndex={0}
+            role="button"
+            aria-label={`${unitName}. Compra ${compact(total)}/ano CMV.`}
+            opacity={nodeOp(unitId, activeHouses)}
+            onMouseEnter={() => setHover(unitId)}
+            onMouseLeave={() => setHover(null)}
+            onFocus={() => setHover(unitId)}
+            onBlur={() => setHover(null)}
+          >
+            <title>{`${unitName} · Compra CMV ${compact(total)}/ano`}</title>
+            <rect x="80" y={layout.y} width="10" height={h} rx="2" fill="#b5a0df" />
+            <text x="96" y={layout.y + h / 2 - 5}>
+              {unitName.slice(0, 20)}
+            </text>
+            <text x="96" y={layout.y + h / 2 + 11} className="map-svg-value">
+              {`Compra ${compact(total)}/ano`}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Nós de FORNECEDORES */}
       {flow.sources.map((s) => {
-        const y = sources.get(s.id)!.y,
-          h = s.value * scale,
-          v = suppliers.find((r) => r.raiz_cnpj === s.id),
-          ratio =
-            v && Number(v.em_aberto) > 0
-              ? Number(v.vencido) / Number(v.em_aberto)
-              : 0;
+        const layout = sourcesLayout.get(s.id)!;
+        const h = s.value * scaleS2;
+        const v = suppliers.find((r) => r.raiz_cnpj === s.id);
+        const ratio =
+          v && Number(v.em_aberto) > 0
+            ? Number(v.vencido) / Number(v.em_aberto)
+            : 0;
         const spend = v?.gasto_12m == null ? null : Number(v.gasto_12m);
-        const revenue = v?.receita_atribuida == null ? null : Number(v.receita_atribuida);
+        const revenue =
+          v?.receita_atribuida == null ? null : Number(v.receita_atribuida);
         const leverage =
-          spend !== null && spend > 0 && revenue !== null ? revenue / spend : null;
-        const subLabel = spend !== null
-          ? `Compra ${compact(spend)}/ano${leverage !== null ? ` · Alavanca ${leverage.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}x` : ""}`
-          : null;
+          spend !== null && spend > 0 && revenue !== null
+            ? revenue / spend
+            : null;
+        const subLabel =
+          spend !== null
+            ? `Compra ${compact(spend)}/ano${leverage !== null ? ` · Alavanca ${leverage.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}x` : ""}`
+            : null;
+        const cy = layout.y + h / 2;
         return (
           <g
             key={s.id}
             className="map-svg-node"
             tabIndex={0}
             role="button"
-            aria-label={`${names.get(s.id)}. ${supplierMetrics(v).map(m => m.label).join(". ")}. Abrir dependência.`}
+            aria-label={`${names.get(s.id)}. ${supplierMetrics(v).map((m) => m.label).join(". ")}. Abrir dependência.`}
             onClick={() => open(s.id)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
@@ -715,53 +922,37 @@ function Sankey({
             onBlur={() => setHover(null)}
             onMouseEnter={() => setHover(s.id)}
             onMouseLeave={() => setHover(null)}
-            opacity={
-              hover &&
-              hover !== s.id &&
-              !flow.links.some((l) => l.source === s.id && l.target === hover)
-                ? 0.08
-                : 1
-            }
+            opacity={nodeOp(s.id, activeSuppliers)}
           >
-            <title>
-              {amountSource} Vencido / em aberto: {pct(ratio)}.
-            </title>
-            <rect x="560" y={y} width="10" height={h} rx="2" fill="#b5a0df" />
+            <title>{`Vencido / em aberto: ${pct(ratio)}. ${amountSource}`}</title>
+            {/* Anel vencido/em-aberto: junto do rect, à esquerda */}
+            <circle cx="754" cy={cy} r="9" stroke="#443b55" strokeWidth="3" fill="none" />
             <circle
-              cx="17"
-              cy={y + h / 2}
-              r="9"
-              stroke="#443b55"
-              strokeWidth="3"
-              fill="none"
-            />
-            <circle
-              cx="17"
-              cy={y + h / 2}
+              cx="754"
+              cy={cy}
               r="9"
               stroke="#ed7778"
               strokeWidth="3"
               fill="none"
               strokeDasharray={`${ratio * 56.55} 56.55`}
             />
-            <text x="553" y={y + h / 2 - 5} textAnchor="end">
-              {names.get(s.id) ?? s.id}
+            {/* Rect do nó de fornecedor */}
+            <rect x="764" y={layout.y} width="10" height={h} rx="2" fill="#b5a0df" />
+            <text x="742" y={cy - 5} textAnchor="end">
+              {(names.get(s.id) ?? s.id).slice(0, 24)}
             </text>
             {subLabel && (
-              <text
-                x="553"
-                y={y + h / 2 + 11}
-                textAnchor="end"
-                className="map-svg-value"
-              >
+              <text x="742" y={cy + 11} textAnchor="end" className="map-svg-value">
                 {subLabel}
               </text>
             )}
           </g>
         );
       })}
+
+      {/* Nós de PRATOS */}
       {flow.targets.map((t) => {
-        const y = targets.get(t.id)!.y;
+        const y = targetsLayout.get(t.id)!.y;
         return (
           <g
             key={t.id}
@@ -772,28 +963,22 @@ function Sankey({
             onBlur={() => setHover(null)}
             onMouseEnter={() => setHover(t.id)}
             onMouseLeave={() => setHover(null)}
-            opacity={
-              hover &&
-              hover !== t.id &&
-              !flow.links.some((l) => l.target === t.id && l.source === hover)
-                ? 0.08
-                : 1
-            }
+            opacity={nodeOp(t.id, activeDishes)}
           >
             <title>{amountSource}</title>
             <rect
-              x="1135"
+              x="1450"
               y={y}
               width="7"
-              height={t.value * scale}
+              height={t.value * scaleS2}
               fill="#839087"
             />
-            <text x="1153" y={y + (t.value * scale) / 2 - 3}>
+            <text x="1465" y={y + (t.value * scaleS2) / 2 - 3}>
               {t.name.slice(0, 32)}
             </text>
             <text
-              x="1153"
-              y={y + (t.value * scale) / 2 + 13}
+              x="1465"
+              y={y + (t.value * scaleS2) / 2 + 13}
               className="map-svg-value"
             >
               {compact(t.value)}
