@@ -16,6 +16,7 @@ export type PedidoConsumption = {
 export type PedidoItem = {
   id: string; descricao: string; unidade_medida: string | null;
   stock: PedidoStock | null; consumption: PedidoConsumption[]; desbloqueia: string[];
+  qtd_maxima: number | null;
 };
 export type PedidoContext = { credit: PedidoCredit | null; items: PedidoItem[]; readAt: string };
 export const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -52,5 +53,16 @@ export function suggestQuantity(item: PedidoItem, start: string, days: number, p
   }
   const demand = terms.reduce((a, b) => a + b, 0);
   const quantity = Math.ceil(Math.max(0, demand - stock) / pack);
+  // Cap by qtd_maxima if set
+  if (item.qtd_maxima != null && stock != null) {
+    const maxOrder = Math.max(0, Math.floor((item.qtd_maxima - stock) / pack));
+    if (quantity > maxOrder) {
+      const capped = maxOrder;
+      return {
+        quantity: capped,
+        formula: `${days} dias × média dos dias cobertos (${demand / days}) = ${demand} ${item.unidade_medida ?? "un."}; estoque ${stock}; máximo(0, ${demand} − ${stock}) ÷ ${pack} = ${quantity} · limitado pelo máximo cadastrado: não ultrapassar ${item.qtd_maxima} ${item.unidade_medida ?? "un."} em estoque → piso(${item.qtd_maxima} − ${stock}) ÷ ${pack} = ${capped}. Consumo: Σ(média Lorean × quantidade na ficha explodida confirmada). Estoque: ${item.stock?.fonte}.`,
+      };
+    }
+  }
   return { quantity, formula: `${days} dias × média dos dias cobertos (${demand / days}) = ${demand} ${item.unidade_medida ?? "un."}; estoque ${stock}; máximo(0, ${demand} − ${stock}) ÷ ${pack} por unidade de compra, arredondado para cima = ${quantity}. Consumo: Σ(média Lorean × quantidade na ficha explodida confirmada). Estoque: ${item.stock?.fonte}.` };
 }

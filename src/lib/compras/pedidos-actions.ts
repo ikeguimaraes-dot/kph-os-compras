@@ -56,6 +56,18 @@ export async function getPedidoContext(raw: { unit: string; root: string }): Pro
   ]);
   if (credit.error) throw new Error(credit.error.message);
   const ids = [...new Set(shares.map((s) => s.item_id).filter(Boolean))];
+  // Load qtd_maxima for each item
+  const minmax: { insumo_id: string; qtd_maxima: number | null }[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const r = await db.from("compras_estoque_minimo")
+      .select("insumo_id,qtd_maxima")
+      .eq("unit_id", v.unit)
+      .range(offset, offset + 999);
+    if (r.error) throw new Error(r.error.message);
+    minmax.push(...(r.data as { insumo_id: string; qtd_maxima: number | null }[]));
+    if (r.data.length < 1000) break;
+  }
+  const maxMap = new Map(minmax.map((m) => [m.insumo_id, m.qtd_maxima]));
   const catalog: { id: string; descricao: string; unidade_medida: string | null }[] = [];
   for (let i = 0; i < ids.length; i += 100) {
     const r = await db.from("everest_itens").select("id,descricao,unidade_medida").in("id", ids.slice(i, i + 100));
@@ -68,7 +80,8 @@ export async function getPedidoContext(raw: { unit: string; root: string }): Pro
       const days = consumption.filter((c) => c.insumo_id === item.id);
       const dishes = new Set(days.flatMap((d) => d.pratos.map((p) => p.produto_id)));
       return { ...item, stock: stocks.find((s) => s.item_id === item.id) ?? null, consumption: days,
-        desbloqueia: [...new Set(blocks.filter((b) => dishes.has(b.prato_id)).map((b) => b.nome))] };
+        desbloqueia: [...new Set(blocks.filter((b) => dishes.has(b.prato_id)).map((b) => b.nome))],
+        qtd_maxima: maxMap.get(item.id) ?? null };
     }),
   };
 }

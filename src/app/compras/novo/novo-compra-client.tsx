@@ -135,6 +135,7 @@ export function NovoCompraClient({ unitId, unitName, brandId, suppliers, groups 
           {item ? <ItemContext item={item} /> : <p>Sem ficha vinculada · estoque e consumo não calculados.</p>}
           <div className="pedido-section-head"><div>{suggestion && <>
             <button type="button" title={suggestion.formula} disabled={suggestion.quantity === null || pending} onClick={() => update(row.key, { quantidade: String(suggestion.quantity) })}>Usar sugestão: {number(suggestion.quantity)} {row.unidade}</button>
+            {suggestion.formula.includes("limitado pelo máximo") && <small style={{ color: "#2563eb", marginLeft: "0.5rem" }}>Teto: máximo cadastrado</small>}
             <details><summary>Fórmula e fontes da sugestão</summary><p>{suggestion.formula}</p></details>
           </>}</div><strong title="Quantidade × preço por unidade de compra; arredondamento em centavos.">{formatBRL(orderTotal([{ quantidade: Number(row.quantidade), preco_unitario: Number(row.preco_unitario) }]))}</strong></div>
         </article>;

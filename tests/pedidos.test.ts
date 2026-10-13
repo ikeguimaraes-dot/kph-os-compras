@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { creditState, orderTotal, suggestQuantity, type PedidoItem } from "../src/lib/compras/pedidos";
 import { purchaseOrderCreateSchema } from "../src/lib/compras/schema";
-const item: PedidoItem = { id: "item", descricao: "Insumo", unidade_medida: "KG", desbloqueia: [],
+const item: PedidoItem = { id: "item", descricao: "Insumo", unidade_medida: "KG", desbloqueia: [], qtd_maxima: null,
   stock: { item_id: "item", quantidade: 3, unidade_medida: "KG", posicao_de: "2026-10-01", posicao_ate: "2026-10-01", fonte: "Everest", posicoes: [] },
   consumption: [1, 2, 3, 4, 5, 6, 7].map((dow) => ({ insumo_id: "item", dow, consumo_medio: dow, dias_observados: 12, pratos: [] })) };
 test("cobertura segue os dias cobertos, cruza domingo e arredonda a embalagem", () => {
