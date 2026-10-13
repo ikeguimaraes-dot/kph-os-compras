@@ -121,7 +121,7 @@ export function GhosMark() {
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, badge86 }: { children: React.ReactNode; badge86?: number }) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
   const { unitId, units, setUnit } = useUnit();
@@ -200,6 +200,25 @@ function Shell({ children }: { children: React.ReactNode }) {
                 >
                   <item.icon size={17} strokeWidth={1.5} />
                   <span>{item.label}</span>
+                  {item.href === "/compras/abastecimento" && badge86 ? (
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        background: "#b91c1c",
+                        color: "#fff",
+                        fontSize: "0.65rem",
+                        fontWeight: 700,
+                        borderRadius: "0.75rem",
+                        padding: "0.1rem 0.4rem",
+                        lineHeight: 1.4,
+                        minWidth: "1.4rem",
+                        textAlign: "center",
+                      }}
+                      aria-label={`${badge86} episódios abertos`}
+                    >
+                      {badge86}
+                    </span>
+                  ) : null}
                   {active && <i aria-hidden="true" />}
                 </Link>
               );
@@ -279,7 +298,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function GhosShell({ children }: { children: React.ReactNode }) {
+export function GhosShell({ children, badge86 }: { children: React.ReactNode; badge86?: number }) {
   return (
     <ThemeProvider
       attribute="class"
@@ -288,7 +307,7 @@ export function GhosShell({ children }: { children: React.ReactNode }) {
       storageKey="ghos-theme"
       disableTransitionOnChange
     >
-      <Shell>{children}</Shell>
+      <Shell badge86={badge86}>{children}</Shell>
     </ThemeProvider>
   );
 }
