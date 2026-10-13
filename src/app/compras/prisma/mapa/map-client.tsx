@@ -638,10 +638,10 @@ function Sankey({
       aria-label="Fluxo fornecedor para prato, espessura proporcional à receita atribuída"
     >
       <text x="12" y="14" className="map-svg-caption">
-        FORNECEDORES
+        R$ QUE ENTRA · FORNECEDORES
       </text>
       <text x="1150" y="14" className="map-svg-caption">
-        PRATOS · TOP 12 + OUTROS
+        VIRA VENDA · PRATOS
       </text>
       {flow.links.map((l, i) => {
         const s = sources.get(l.source)!,
@@ -690,6 +690,13 @@ function Sankey({
             v && Number(v.em_aberto) > 0
               ? Number(v.vencido) / Number(v.em_aberto)
               : 0;
+        const spend = v?.gasto_12m == null ? null : Number(v.gasto_12m);
+        const revenue = v?.receita_atribuida == null ? null : Number(v.receita_atribuida);
+        const leverage =
+          spend !== null && spend > 0 && revenue !== null ? revenue / spend : null;
+        const subLabel = spend !== null
+          ? `Compra ${compact(spend)}/ano${leverage !== null ? ` · Alavanca ${leverage.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}x` : ""}`
+          : null;
         return (
           <g
             key={s.id}
@@ -737,17 +744,19 @@ function Sankey({
               fill="none"
               strokeDasharray={`${ratio * 56.55} 56.55`}
             />
-            <text x="35" y={y + h / 2 - 3}>
-              {(names.get(s.id) ?? s.id).slice(0, 26)}
+            <text x="553" y={y + h / 2 - 5} textAnchor="end">
+              {names.get(s.id) ?? s.id}
             </text>
-            {supplierMetrics(v).map((metric, index) => (
-              <text key={metric.label} x={index === 1 ? 270 : 35}
-                y={y + h / 2 + (index === 2 ? 33 : 15)} className="map-svg-value"
-                tabIndex={0} aria-label={`${metric.label}. ${metric.source}`}>
-                <title>{metric.source}</title>
-                {metric.label}
+            {subLabel && (
+              <text
+                x="553"
+                y={y + h / 2 + 11}
+                textAnchor="end"
+                className="map-svg-value"
+              >
+                {subLabel}
               </text>
-            ))}
+            )}
           </g>
         );
       })}
