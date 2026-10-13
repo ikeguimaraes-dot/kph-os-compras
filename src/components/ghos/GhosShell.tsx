@@ -19,6 +19,7 @@ import {
   LogOut,
   Menu,
   Moon,
+  Network,
   PackageCheck,
   ShoppingBasket,
   Sun,
@@ -39,6 +40,11 @@ const groups = [
         href: "/compras/prisma",
         label: "Prisma de margem",
         icon: ChartNoAxesCombined,
+      },
+      {
+        href: "/compras/prisma/mapa",
+        label: "Mapa de dependências",
+        icon: Network,
       },
       {
         href: "/compras/abastecimento",
