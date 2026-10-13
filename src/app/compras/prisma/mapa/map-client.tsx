@@ -14,6 +14,7 @@ import { addPrismaPlan } from "@/lib/compras/prisma-actions";
 import {
   aggregateSuppliers,
   blockKey,
+  buildCategoryFlow,
   buildFlow,
   creditColor,
   dishKey,
@@ -23,6 +24,7 @@ import {
   unpricedDishes,
   mapView,
   titleTimeline,
+  type CategoryFlow,
   type MapBlock,
   type MapEdge,
   type MapFilters,
@@ -126,6 +128,10 @@ export default function MapClient({
   const flow = useMemo(
     () => buildFlow(edges, blocks, filters.period),
     [edges, blocks, filters.period],
+  );
+  const categoryFlow = useMemo(
+    () => buildCategoryFlow(edges, suppliers),
+    [edges, suppliers],
   );
   const focus =
     selected || flow.sources[0]?.id || suppliers[0]?.raiz_cnpj || "";
@@ -332,15 +338,12 @@ export default function MapClient({
                 <div className="map-desktop">
                   <Sankey
                     flow={flow}
+                    categoryFlow={categoryFlow}
                     suppliers={suppliers}
                     names={names}
                     hover={hover}
                     setHover={setHover}
                     open={openFocus}
-                    unitSuppliers={data.suppliers.filter(
-                      (s) => !filters.unit || s.unit_id === filters.unit,
-                    )}
-                    units={data.units}
                   />
                 </div>
                 <p className="map-legend-stage">
@@ -605,88 +608,60 @@ function DebtRing({ supplier }: { supplier: MapSupplier }) {
 }
 function Sankey({
   flow,
+  categoryFlow,
   suppliers,
   names,
   hover,
   setHover,
   open,
-  unitSuppliers,
-  units,
 }: {
   flow: ReturnType<typeof buildFlow>;
+  categoryFlow: CategoryFlow;
   suppliers: MapSupplier[];
   names: Map<string, string>;
   hover: string | null;
   setHover: (v: string | null) => void;
   open: (v: string) => void;
-  unitSuppliers: MapSupplier[];
-  units: { id: string; name: string }[];
 }) {
-  // IDs dos fornecedores que aparecem no flow (têm receita atribuída)
   const flowSupplierIds = new Set(flow.sources.map((s) => s.id));
 
-  // Para cada (unit_id, raiz_cnpj) que aparece no flow, registrar o gasto
-  const houseSuppliersSpend = new Map<
-    string,
-    { unit_id: string; raiz_cnpj: string; value: number }[]
-  >();
-  for (const s of unitSuppliers) {
-    if (!flowSupplierIds.has(s.raiz_cnpj)) continue;
-    const key = s.unit_id;
-    const arr = houseSuppliersSpend.get(key) ?? [];
-    const existing = arr.find((x) => x.raiz_cnpj === s.raiz_cnpj);
-    if (existing) existing.value += Number(s.gasto_12m);
-    else arr.push({ unit_id: s.unit_id, raiz_cnpj: s.raiz_cnpj, value: Number(s.gasto_12m) });
-    houseSuppliersSpend.set(key, arr);
+  // Filtrar catLinks para apenas fornecedores que aparecem no S2
+  const catLinks = categoryFlow.catLinks.filter((l) => flowSupplierIds.has(l.raiz_cnpj));
+
+  // catId → Set<raiz_cnpj> e raiz_cnpj → Set<catId>
+  const catToSuppliersMap = new Map<string, Set<string>>();
+  const supplierToCatsMap = new Map<string, Set<string>>();
+  for (const l of catLinks) {
+    const cs = catToSuppliersMap.get(l.catId) ?? new Set<string>();
+    cs.add(l.raiz_cnpj);
+    catToSuppliersMap.set(l.catId, cs);
+    const sc = supplierToCatsMap.get(l.raiz_cnpj) ?? new Set<string>();
+    sc.add(l.catId);
+    supplierToCatsMap.set(l.raiz_cnpj, sc);
   }
 
-  // Total por casa (apenas fornecedores no flow)
-  const houseTotals = new Map<string, number>();
-  for (const [unitId, items] of houseSuppliersSpend) {
-    houseTotals.set(unitId, items.reduce((s, x) => s + x.value, 0));
-  }
-
-  // Array plano de links S1 (para cada casa, na ordem dos flow.sources)
-  const houseLinksArr: { unit_id: string; raiz_cnpj: string; value: number }[] = [];
-  for (const [, items] of houseSuppliersSpend) {
-    const ordered = flow.sources
-      .filter((s) => items.some((x) => x.raiz_cnpj === s.id))
-      .map((s) => items.find((x) => x.raiz_cnpj === s.id)!);
-    houseLinksArr.push(...ordered);
-  }
-
-  // supplierToHousesMap: raiz_cnpj → Set<unit_id>
-  const supplierToHousesMap = new Map<string, Set<string>>();
-  for (const l of houseLinksArr) {
-    const set = supplierToHousesMap.get(l.raiz_cnpj) ?? new Set<string>();
-    set.add(l.unit_id);
-    supplierToHousesMap.set(l.raiz_cnpj, set);
-  }
-
-  const nHouses = houseTotals.size;
-  const totalHouseSpend = [...houseTotals.values()].reduce((a, b) => a + b, 0);
+  const nCats = categoryFlow.categories.length;
   const height = Math.max(
     650,
-    Math.max(nHouses, flow.sources.length, flow.targets.length) * 65 + 420,
+    Math.max(nCats, flow.sources.length, flow.targets.length) * 65 + 420,
   );
   // Scale S2 (fornecedor→prato)
   const scaleS2 =
     (height - 50 - Math.max(flow.sources.length, flow.targets.length) * 60) /
     flow.total;
-  // Scale S1 (casa→fornecedor): proporcional ao gasto
+  // Scale S1 (categoria→fornecedor): proporcional ao CMV total
   const scaleS1 =
-    totalHouseSpend > 0
-      ? (height - 50 - Math.max(nHouses, flow.sources.length) * 60) /
-        totalHouseSpend
+    categoryFlow.total > 0
+      ? (height - 50 - Math.max(nCats, flow.sources.length) * 60) /
+        categoryFlow.total
       : scaleS2;
 
-  // Casas ordenadas por gasto decrescente
-  const houseOrder = [...houseTotals.entries()].sort((a, b) => b[1] - a[1]);
-  const houseYMap = new Map<string, { y: number; offset: number }>();
-  let hy = 28;
-  for (const [unitId, total] of houseOrder) {
-    houseYMap.set(unitId, { y: hy, offset: 0 });
-    hy += total * scaleS1 + 60;
+  // Layout de categorias (S1 — lado esquerdo)
+  const catYMap = new Map<string, { y: number; offset: number }>();
+  let catY = 28;
+  for (const cat of categoryFlow.categories) {
+    catYMap.set(cat.id, { y: catY, offset: 0 });
+    catY += cat.value * scaleS1 + 60;
   }
 
   // Fornecedores
@@ -705,27 +680,29 @@ function Sankey({
     ty += t.value * scaleS2 + 60;
   }
 
-  // Hover de 3 estágios
-  let activeHouses: Set<string> | null = null;
+  // Hover de 3 estágios: categoria → fornecedor → prato (e inverso)
+  const catIds = new Set(categoryFlow.categories.map((c) => c.id));
+
+  let activeCats: Set<string> | null = null;
   let activeSuppliers: Set<string> | null = null;
   let activeDishes: Set<string> | null = null;
 
   if (hover) {
-    activeHouses = new Set<string>();
+    activeCats = new Set<string>();
     activeSuppliers = new Set<string>();
     activeDishes = new Set<string>();
 
-    if (houseTotals.has(hover)) {
-      // hover = casa
-      activeHouses.add(hover);
-      for (const l of houseLinksArr) {
-        if (l.unit_id === hover) activeSuppliers.add(l.raiz_cnpj);
+    if (catIds.has(hover)) {
+      // hover = categoria
+      activeCats.add(hover);
+      for (const s of catToSuppliersMap.get(hover) ?? new Set<string>()) {
+        activeSuppliers.add(s);
       }
     } else if (flowSupplierIds.has(hover)) {
       // hover = fornecedor
       activeSuppliers.add(hover);
-      for (const h of supplierToHousesMap.get(hover) ?? new Set<string>()) {
-        activeHouses.add(h);
+      for (const c of supplierToCatsMap.get(hover) ?? new Set<string>()) {
+        activeCats.add(c);
       }
     } else {
       // hover = prato
@@ -733,8 +710,8 @@ function Sankey({
       for (const l of flow.links) {
         if (l.target === hover) {
           activeSuppliers.add(l.source);
-          for (const h of supplierToHousesMap.get(l.source) ?? new Set<string>()) {
-            activeHouses.add(h);
+          for (const c of supplierToCatsMap.get(l.source) ?? new Set<string>()) {
+            activeCats.add(c);
           }
         }
       }
@@ -749,14 +726,14 @@ function Sankey({
 
   const nodeOp = (id: string, active: Set<string> | null) =>
     !hover ? 1 : active?.has(id) ? 1 : 0.08;
-  const s1Op = (uid: string, rcnpj: string) =>
-    !hover ? 0.6 : activeHouses?.has(uid) && activeSuppliers?.has(rcnpj) ? 0.6 : 0.08;
+  const s1Op = (catId: string, rcnpj: string) =>
+    !hover ? 0.6 : activeCats?.has(catId) && activeSuppliers?.has(rcnpj) ? 0.6 : 0.08;
   const s2Op = (src: string, tgt: string) =>
     !hover ? 0.6 : activeSuppliers?.has(src) && activeDishes?.has(tgt) ? 0.6 : 0.08;
 
-  // Offsets para links S1 (cópia para não mutar houseYMap/sourcesLayout durante render)
-  const houseOffsets = new Map(
-    [...houseYMap.entries()].map(([k, v]) => [k, { y: v.y, offset: 0 }]),
+  // Offsets para links S1 (categoria→fornecedor)
+  const catOffsets = new Map(
+    [...catYMap.entries()].map(([k, v]) => [k, { y: v.y, offset: 0 }]),
   );
   const sourceOffsetsS1 = new Map(
     flow.sources.map((s) => [s.id, { y: sourcesLayout.get(s.id)!.y, offset: 0 }]),
@@ -778,10 +755,10 @@ function Sankey({
       className="map-flow"
       viewBox={`0 0 1800 ${height}`}
       role="group"
-      aria-label="Fluxo casas para fornecedores para pratos, espessura proporcional ao gasto e receita atribuída"
+      aria-label="Fluxo categorias para fornecedores para pratos, espessura proporcional ao CMV e receita atribuída"
     >
       <text x="12" y="14" className="map-svg-caption">
-        R$ QUE SAI DO CAIXA · CASAS
+        R$ QUE SAI DO CAIXA · CATEGORIAS
       </text>
       <text x="680" y="14" className="map-svg-caption">
         FORNECEDORES
@@ -790,31 +767,42 @@ function Sankey({
         VIRA VENDA · PRATOS
       </text>
 
-      {/* Links S1: casas → fornecedores */}
-      {houseLinksArr.map((l) => {
-        const h = houseOffsets.get(l.unit_id)!;
-        const s = sourceOffsetsS1.get(l.raiz_cnpj)!;
-        const width = l.value * scaleS1;
-        const y1 = h.y + h.offset + width / 2;
-        const y2 = s.y + s.offset + width / 2;
-        h.offset += width;
-        s.offset += width;
-        return (
-          <path
-            key={`s1-${l.unit_id}-${l.raiz_cnpj}`}
-            d={`M 90 ${y1} C 330 ${y1}, 590 ${y2}, 762 ${y2}`}
-            strokeWidth={width}
-            className="map-flow-link green"
-            opacity={s1Op(l.unit_id, l.raiz_cnpj)}
-            onMouseEnter={() => setHover(l.unit_id)}
-            onMouseLeave={() => setHover(null)}
-            onFocus={() => setHover(l.unit_id)}
-            onBlur={() => setHover(null)}
-          >
-            <title>{`${units.find((u) => u.id === l.unit_id)?.name ?? l.unit_id} → ${names.get(l.raiz_cnpj) ?? l.raiz_cnpj}: ${compact(l.value)}/ano CMV`}</title>
-          </path>
+      {/* Links S1: categorias → fornecedores */}
+      {(() => {
+        const catOrder = new Map(categoryFlow.categories.map((c, i) => [c.id, i]));
+        const supOrder = new Map(flow.sources.map((s, i) => [s.id, i]));
+        const sorted = [...catLinks].sort(
+          (a, b) =>
+            (catOrder.get(a.catId) ?? 999) - (catOrder.get(b.catId) ?? 999) ||
+            (supOrder.get(a.raiz_cnpj) ?? 999) - (supOrder.get(b.raiz_cnpj) ?? 999),
         );
-      })}
+        return sorted.map((l) => {
+          const c = catOffsets.get(l.catId);
+          const s = sourceOffsetsS1.get(l.raiz_cnpj);
+          if (!c || !s) return null;
+          const width = l.value * scaleS1;
+          const y1 = c.y + c.offset + width / 2;
+          const y2 = s.y + s.offset + width / 2;
+          c.offset += width;
+          s.offset += width;
+          const catDisplay = l.catId === "outras" ? "Outras" : categoryName(l.catId);
+          return (
+            <path
+              key={`s1-${l.catId}-${l.raiz_cnpj}`}
+              d={`M 90 ${y1} C 330 ${y1}, 590 ${y2}, 762 ${y2}`}
+              strokeWidth={width}
+              className="map-flow-link green"
+              opacity={s1Op(l.catId, l.raiz_cnpj)}
+              onMouseEnter={() => setHover(l.catId)}
+              onMouseLeave={() => setHover(null)}
+              onFocus={() => setHover(l.catId)}
+              onBlur={() => setHover(null)}
+            >
+              <title>{`${catDisplay} → ${names.get(l.raiz_cnpj) ?? l.raiz_cnpj}: ${compact(l.value)}/ano CMV`}</title>
+            </path>
+          );
+        });
+      })()}
 
       {/* Links S2: fornecedores → pratos */}
       {flow.links.map((l, i) => {
@@ -853,31 +841,29 @@ function Sankey({
         );
       })}
 
-      {/* Nós de CASAS */}
-      {houseOrder.map(([unitId, total]) => {
-        const layout = houseYMap.get(unitId)!;
-        const h = total * scaleS1;
-        const unitName = units.find((u) => u.id === unitId)?.name ?? unitId;
+      {/* Nós de CATEGORIAS */}
+      {categoryFlow.categories.map((cat) => {
+        const layout = catYMap.get(cat.id)!;
+        const h = cat.value * scaleS1;
+        const catDisplay = cat.id === "outras" ? "Outras" : categoryName(cat.id);
         return (
           <g
-            key={unitId}
+            key={cat.id}
             className="map-svg-node"
             tabIndex={0}
             role="button"
-            aria-label={`${unitName}. Compra ${compact(total)}/ano CMV.`}
-            opacity={nodeOp(unitId, activeHouses)}
-            onMouseEnter={() => setHover(unitId)}
+            aria-label={`${catDisplay}. Compra ${compact(cat.value)}/ano CMV.`}
+            opacity={nodeOp(cat.id, activeCats)}
+            onMouseEnter={() => setHover(cat.id)}
             onMouseLeave={() => setHover(null)}
-            onFocus={() => setHover(unitId)}
+            onFocus={() => setHover(cat.id)}
             onBlur={() => setHover(null)}
           >
-            <title>{`${unitName} · Compra CMV ${compact(total)}/ano`}</title>
+            <title>{`${catDisplay} · CMV ${compact(cat.value)}/ano`}</title>
             <rect x="80" y={layout.y} width="10" height={h} rx="2" fill="#b5a0df" />
-            <text x="96" y={layout.y + h / 2 - 5}>
-              {unitName.slice(0, 20)}
-            </text>
+            <text x="96" y={layout.y + h / 2 - 5}>{catDisplay.slice(0, 22)}</text>
             <text x="96" y={layout.y + h / 2 + 11} className="map-svg-value">
-              {`Compra ${compact(total)}/ano`}
+              {`${compact(cat.value)}/ano`}
             </text>
           </g>
         );
@@ -925,7 +911,6 @@ function Sankey({
             opacity={nodeOp(s.id, activeSuppliers)}
           >
             <title>{`Vencido / em aberto: ${pct(ratio)}. ${amountSource}`}</title>
-            {/* Anel vencido/em-aberto: junto do rect, à esquerda */}
             <circle cx="754" cy={cy} r="9" stroke="#443b55" strokeWidth="3" fill="none" />
             <circle
               cx="754"
@@ -936,7 +921,6 @@ function Sankey({
               fill="none"
               strokeDasharray={`${ratio * 56.55} 56.55`}
             />
-            {/* Rect do nó de fornecedor */}
             <rect x="764" y={layout.y} width="10" height={h} rx="2" fill="#b5a0df" />
             <text x="742" y={cy - 5} textAnchor="end">
               {(names.get(s.id) ?? s.id).slice(0, 24)}
