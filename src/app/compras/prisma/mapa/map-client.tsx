@@ -26,6 +26,7 @@ import {
   titleTimeline,
   type CategoryFlow,
   type MapBlock,
+  type MapCatPurchase,
   type MapEdge,
   type MapFilters,
   type MapPeriod,
@@ -129,9 +130,16 @@ export default function MapClient({
     () => buildFlow(edges, blocks, filters.period),
     [edges, blocks, filters.period],
   );
+  const catPurchases = useMemo(
+    () =>
+      (data.catPurchases as MapCatPurchase[] ?? []).filter(
+        (c) => !filters.unit || c.unit_id === filters.unit,
+      ),
+    [data.catPurchases, filters.unit],
+  );
   const categoryFlow = useMemo(
-    () => buildCategoryFlow(edges, suppliers),
-    [edges, suppliers],
+    () => buildCategoryFlow(catPurchases),
+    [catPurchases],
   );
   const focus =
     selected || flow.sources[0]?.id || suppliers[0]?.raiz_cnpj || "";
@@ -798,7 +806,7 @@ function Sankey({
               onFocus={() => setHover(l.catId)}
               onBlur={() => setHover(null)}
             >
-              <title>{`${catDisplay} → ${names.get(l.raiz_cnpj) ?? l.raiz_cnpj}: ${compact(l.value)}/ano CMV`}</title>
+              <title>{`${catDisplay} → ${names.get(l.raiz_cnpj) ?? l.raiz_cnpj}: ${compact(l.value)}/ano · compra real (notas fiscais 12m)`}</title>
             </path>
           );
         });
@@ -852,14 +860,14 @@ function Sankey({
             className="map-svg-node"
             tabIndex={0}
             role="button"
-            aria-label={`${catDisplay}. Compra ${compact(cat.value)}/ano CMV.`}
+            aria-label={`${catDisplay}. ${compact(cat.value)}/ano compra real.`}
             opacity={nodeOp(cat.id, activeCats)}
             onMouseEnter={() => setHover(cat.id)}
             onMouseLeave={() => setHover(null)}
             onFocus={() => setHover(cat.id)}
             onBlur={() => setHover(null)}
           >
-            <title>{`${catDisplay} · CMV ${compact(cat.value)}/ano`}</title>
+            <title>{`${catDisplay} · ${compact(cat.value)}/ano · compra real (notas fiscais 12m)`}</title>
             <rect x="80" y={layout.y} width="10" height={h} rx="2" fill="#b5a0df" />
             <text x="96" y={layout.y + h / 2 - 5}>{catDisplay.slice(0, 22)}</text>
             <text x="96" y={layout.y + h / 2 + 11} className="map-svg-value">

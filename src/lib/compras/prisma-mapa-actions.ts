@@ -6,7 +6,7 @@ import { comprasAccess } from "./everest-access";
 import { createServiceClient } from "@kph/db/supabase/server";
 import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { MapEdge, MapSupplier, MapTitle, MapBlock } from "./prisma-mapa";
+import type { MapEdge, MapSupplier, MapTitle, MapBlock, MapCatPurchase } from "./prisma-mapa";
 import { getPrisma } from "./prisma-actions";
 import { PRISMA } from "./prisma-config";
 
@@ -55,7 +55,7 @@ async function all<T>(
 }
 async function loadMap(ids: string[]) {
     // Scope participates in the cache key. Never cache authentication decisions.
-    const [edges, suppliers, titles, blocks] = await Promise.all([
+    const [edges, suppliers, titles, blocks, catPurchases] = await Promise.all([
       all<MapEdge>("v_mapa_aresta", ids, [
         "unit_id",
         "produto_venda_ficha_id",
@@ -65,12 +65,14 @@ async function loadMap(ids: string[]) {
       all<MapSupplier>("v_mapa_fornecedor", ids, ["unit_id", "raiz_cnpj"]),
       all<MapTitle>("v_mapa_titulo", ids, ["id"]),
       all<MapBlock>("v_mapa_86", ids, ["id"]),
+      all<MapCatPurchase>("v_mapa_compra_categoria", ids, ["unit_id", "raiz_cnpj", "categoria"]),
     ]);
     return {
       edges,
       suppliers,
       titles,
       blocks,
+      catPurchases,
       readAt: new Date().toISOString(),
     };
 }

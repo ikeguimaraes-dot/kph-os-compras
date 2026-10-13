@@ -245,6 +245,12 @@ export function titleTimeline(titles: MapTitle[]) {
       unknown,
   };
 }
+export type MapCatPurchase = {
+  unit_id: string;
+  raiz_cnpj: string;
+  categoria: string;
+  compra_12m: number;
+};
 export type CatFlowLink = {
   catId: string;
   raiz_cnpj: string;
@@ -255,34 +261,14 @@ export type CategoryFlow = {
   catLinks: CatFlowLink[];
   total: number;
 };
-export function buildCategoryFlow(
-  edges: MapEdge[],
-  suppliers: MapSupplier[],
-): CategoryFlow {
-  const rCatSup = new Map<string, Map<string, number>>();
-  const rSup = new Map<string, number>();
-  for (const e of edges) {
-    if (!e.raiz_cnpj || !e.receita_atribuida || Number(e.receita_atribuida) <= 0) continue;
-    const cat = e.categoria ?? "SEM_CATEGORIA";
-    const val = Number(e.receita_atribuida);
-    const catMap = rCatSup.get(e.raiz_cnpj) ?? new Map<string, number>();
-    catMap.set(cat, (catMap.get(cat) ?? 0) + val);
-    rCatSup.set(e.raiz_cnpj, catMap);
-    rSup.set(e.raiz_cnpj, (rSup.get(e.raiz_cnpj) ?? 0) + val);
-  }
-  const gastoMap = new Map(suppliers.map((s) => [s.raiz_cnpj, Number(s.gasto_12m)]));
+export function buildCategoryFlow(catPurchases: MapCatPurchase[]): CategoryFlow {
   const catTotals = new Map<string, number>();
   const rawLinks: CatFlowLink[] = [];
-  for (const [raiz, catMap] of rCatSup) {
-    const rTotal = rSup.get(raiz) ?? 0;
-    const gasto = gastoMap.get(raiz) ?? 0;
-    if (rTotal <= 0 || gasto <= 0) continue;
-    for (const [cat, rVal] of catMap) {
-      const spend = gasto * (rVal / rTotal);
-      if (spend <= 0) continue;
-      rawLinks.push({ catId: cat, raiz_cnpj: raiz, value: spend });
-      catTotals.set(cat, (catTotals.get(cat) ?? 0) + spend);
-    }
+  for (const row of catPurchases) {
+    const val = Number(row.compra_12m);
+    if (val <= 0) continue;
+    rawLinks.push({ catId: row.categoria, raiz_cnpj: row.raiz_cnpj, value: val });
+    catTotals.set(row.categoria, (catTotals.get(row.categoria) ?? 0) + val);
   }
   const total = [...catTotals.values()].reduce((a, b) => a + b, 0);
   const threshold = total * 0.02;
