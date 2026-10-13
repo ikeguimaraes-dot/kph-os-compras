@@ -12,6 +12,7 @@ import {
   ChevronDown,
   CircleHelp,
   ClipboardCheck,
+  ClipboardList,
   Compass,
   Handshake,
   LayoutDashboard,
@@ -62,6 +63,7 @@ const groups = [
     label: "Operação",
     items: [
       { href: "/compras", label: "Pedidos de compra", icon: ShoppingBasket },
+      { href: "/compras/pedidos", label: "Sugestões de reposição", icon: ClipboardList },
       {
         href: "/compras/abastecimento/acordos",
         label: "Acordos & caixa",
