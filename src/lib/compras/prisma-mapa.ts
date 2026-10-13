@@ -245,6 +245,73 @@ export function titleTimeline(titles: MapTitle[]) {
       unknown,
   };
 }
+export type CatFlowLink = {
+  catId: string;
+  raiz_cnpj: string;
+  value: number;
+};
+export type CategoryFlow = {
+  categories: { id: string; value: number }[];
+  catLinks: CatFlowLink[];
+  total: number;
+};
+export function buildCategoryFlow(
+  edges: MapEdge[],
+  suppliers: MapSupplier[],
+): CategoryFlow {
+  const rCatSup = new Map<string, Map<string, number>>();
+  const rSup = new Map<string, number>();
+  for (const e of edges) {
+    if (!e.raiz_cnpj || !e.receita_atribuida || Number(e.receita_atribuida) <= 0) continue;
+    const cat = e.categoria ?? "SEM_CATEGORIA";
+    const val = Number(e.receita_atribuida);
+    const catMap = rCatSup.get(e.raiz_cnpj) ?? new Map<string, number>();
+    catMap.set(cat, (catMap.get(cat) ?? 0) + val);
+    rCatSup.set(e.raiz_cnpj, catMap);
+    rSup.set(e.raiz_cnpj, (rSup.get(e.raiz_cnpj) ?? 0) + val);
+  }
+  const gastoMap = new Map(suppliers.map((s) => [s.raiz_cnpj, Number(s.gasto_12m)]));
+  const catTotals = new Map<string, number>();
+  const rawLinks: CatFlowLink[] = [];
+  for (const [raiz, catMap] of rCatSup) {
+    const rTotal = rSup.get(raiz) ?? 0;
+    const gasto = gastoMap.get(raiz) ?? 0;
+    if (rTotal <= 0 || gasto <= 0) continue;
+    for (const [cat, rVal] of catMap) {
+      const spend = gasto * (rVal / rTotal);
+      if (spend <= 0) continue;
+      rawLinks.push({ catId: cat, raiz_cnpj: raiz, value: spend });
+      catTotals.set(cat, (catTotals.get(cat) ?? 0) + spend);
+    }
+  }
+  const total = [...catTotals.values()].reduce((a, b) => a + b, 0);
+  const threshold = total * 0.02;
+  const otherCatIds = new Set(
+    [...catTotals.entries()].filter(([, v]) => v < threshold).map(([k]) => k),
+  );
+  const otherLinkMap = new Map<string, number>();
+  const finalLinks: CatFlowLink[] = [];
+  for (const link of rawLinks) {
+    if (otherCatIds.has(link.catId)) {
+      otherLinkMap.set(link.raiz_cnpj, (otherLinkMap.get(link.raiz_cnpj) ?? 0) + link.value);
+    } else {
+      finalLinks.push(link);
+    }
+  }
+  for (const [raiz, value] of otherLinkMap) {
+    if (value > 0) finalLinks.push({ catId: "outras", raiz_cnpj: raiz, value });
+  }
+  const mainCats = [...catTotals.entries()]
+    .filter(([k]) => !otherCatIds.has(k))
+    .map(([id, value]) => ({ id, value }))
+    .sort((a, b) => b.value - a.value);
+  const otherTotal = [...catTotals.entries()]
+    .filter(([k]) => otherCatIds.has(k))
+    .reduce((s, [, v]) => s + v, 0);
+  const categories = [...mainCats];
+  if (otherTotal > 0) categories.push({ id: "outras", value: otherTotal });
+  return { categories, catLinks: finalLinks, total };
+}
 export function aggregateSuppliers(rows: MapSupplier[]) {
   const map = new Map<string, MapSupplier>();
   for (const r of rows) {
