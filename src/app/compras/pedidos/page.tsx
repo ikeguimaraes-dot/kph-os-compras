@@ -1,16 +1,21 @@
 import { getCurrentUnit } from "@kph/auth/unit";
 import { requireUser } from "@kph/auth/server";
 import { getSugestoesReposicao } from "@/lib/compras/pedidos-sugestoes-actions";
+import { getPedidoSugeridoDoMes } from "@/lib/compras/pedido-sugerido-actions";
 import { PedidosSugestoesClient } from "./pedidos-sugestoes-client";
+import { PedidoSugeridoClient } from "./pedido-sugerido-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function PedidosSugestoesPage() {
   await requireUser();
   const unit = await getCurrentUnit();
-  const sugestoes = unit
-    ? await getSugestoesReposicao(unit.id)
-    : { comprar: [], transferir_produzir: [] };
+  const [sugestoes, pedidoSugerido] = unit
+    ? await Promise.all([
+        getSugestoesReposicao(unit.id),
+        getPedidoSugeridoDoMes(unit.id),
+      ])
+    : [{ comprar: [], transferir_produzir: [] }, { grupos: [], ultimo_refresh: null }];
 
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto" }}>
@@ -35,7 +40,7 @@ export default async function PedidosSugestoesPage() {
             letterSpacing: -0.4,
           }}
         >
-          Sugestões de Reposição
+          Pedidos
         </h1>
         <p
           style={{
@@ -46,12 +51,17 @@ export default async function PedidosSugestoesPage() {
           }}
         >
           {unit
-            ? `Itens abaixo do mínimo · ${unit.name}`
+            ? `Sugestões baseadas em tendência e estoque · ${unit.name}`
             : "Selecione uma casa para ver sugestões."}
         </p>
       </header>
+
       {unit && (
-        <PedidosSugestoesClient sugestoes={sugestoes} unitName={unit.name} />
+        <>
+          <PedidoSugeridoClient pedido={pedidoSugerido} unitId={unit.id} />
+          <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "8px 0 32px" }} />
+          <PedidosSugestoesClient sugestoes={sugestoes} unitName={unit.name} />
+        </>
       )}
     </div>
   );
