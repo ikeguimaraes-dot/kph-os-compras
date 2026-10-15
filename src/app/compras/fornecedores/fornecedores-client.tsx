@@ -40,6 +40,8 @@ import {
 import {
   createSupplier,
   deleteSupplier,
+  getLeadTimeByCnpj,
+  saveLeadTimeByCnpj,
   toggleSupplierAtivo,
   updateSupplier,
 } from "@/app/compras/actions";
@@ -80,6 +82,8 @@ export function FornecedoresClient({
   const [showForm, setShowForm] = useState<{ mode: "create" } | { mode: "edit"; row: Supplier } | null>(null);
   const [form, setForm] = useState<FormValues>(EMPTY);
   const [error, setError] = useState<string | null>(null);
+  const [leadTimeInput, setLeadTimeInput] = useState("3");
+  const [leadTimeLoading, setLeadTimeLoading] = useState(false);
 
   function openCreate() {
     setForm(EMPTY);
@@ -97,6 +101,14 @@ export function FornecedoresClient({
     });
     setError(null);
     setShowForm({ mode: "edit", row });
+    setLeadTimeInput("3");
+    if (row.cnpj?.trim()) {
+      setLeadTimeLoading(true);
+      getLeadTimeByCnpj(row.cnpj.trim())
+        .then((d) => setLeadTimeInput(String(d)))
+        .catch(() => {})
+        .finally(() => setLeadTimeLoading(false));
+    }
   }
 
   function handleSave() {
@@ -130,6 +142,9 @@ export function FornecedoresClient({
         if (!r.ok) {
           setError(r.error);
           return;
+        }
+        if (form.cnpj?.trim()) {
+          await saveLeadTimeByCnpj(form.cnpj.trim(), Math.max(1, Math.min(90, Number(leadTimeInput) || 3)));
         }
       }
       setShowForm(null);
@@ -418,6 +433,25 @@ export function FornecedoresClient({
                 />
               </DialogField>
             </div>
+            {showForm?.mode === "edit" && (
+              <div style={{ marginTop: 12 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>
+                  Lead time (dias de entrega)
+                </label>
+                {leadTimeLoading ? (
+                  <span style={{ fontSize: 12, color: "#9ca3af" }}>Carregando…</span>
+                ) : (
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    value={leadTimeInput}
+                    onChange={(e) => setLeadTimeInput(e.target.value)}
+                    style={{ width: 80, padding: "4px 8px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}
+                  />
+                )}
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <DialogField label="Telefone">
                 <Input
