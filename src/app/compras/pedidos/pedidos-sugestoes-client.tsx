@@ -1,6 +1,8 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import type { SugestoesReposicao, SugestaoItem } from "@/lib/compras/pedidos-sugestoes-actions";
+import RelógioItemDrawer from "@/app/compras/relogio-item-drawer";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -35,9 +37,11 @@ function Badge({ origem }: { origem: string }) {
 function SugestaoTable({
   items,
   showValor,
+  onItemClick,
 }: {
   items: SugestaoItem[];
   showValor: boolean;
+  onItemClick: (insumo_id: string) => void;
 }) {
   if (items.length === 0) {
     return (
@@ -139,7 +143,11 @@ function SugestaoTable({
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.insumo_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+            <tr
+              key={item.insumo_id}
+              style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
+              onClick={() => onItemClick(item.insumo_id)}
+            >
               <td style={{ padding: "10px 12px", fontWeight: 500 }}>
                 {item.nome}
                 <span style={{ display: "block", fontSize: 11, color: "#6b7280" }}>
@@ -206,10 +214,13 @@ function SugestaoTable({
 export function PedidosSugestoesClient({
   sugestoes,
   unitName: _unitName,
+  unitId,
 }: {
   sugestoes: SugestoesReposicao;
   unitName: string;
+  unitId: string;
 }) {
+  const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
   const total = sugestoes.comprar.length + sugestoes.transferir_produzir.length;
 
   return (
@@ -265,7 +276,7 @@ export function PedidosSugestoesClient({
             </Link>
           )}
         </div>
-        <SugestaoTable items={sugestoes.comprar} showValor={true} />
+        <SugestaoTable items={sugestoes.comprar} showValor={true} onItemClick={setDrawerItemId} />
       </section>
 
       <section>
@@ -284,8 +295,14 @@ export function PedidosSugestoesClient({
             ({sugestoes.transferir_produzir.length} itens)
           </span>
         </h2>
-        <SugestaoTable items={sugestoes.transferir_produzir} showValor={false} />
+        <SugestaoTable items={sugestoes.transferir_produzir} showValor={false} onItemClick={setDrawerItemId} />
       </section>
+
+      <RelógioItemDrawer
+        itemId={drawerItemId}
+        unitId={unitId}
+        onClose={() => setDrawerItemId(null)}
+      />
     </div>
   );
 }
