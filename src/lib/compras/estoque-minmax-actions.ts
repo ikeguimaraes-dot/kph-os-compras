@@ -14,6 +14,11 @@ export interface EstoqueMinMaxItem {
   origem_reposicao: OrigemReposicao;
   fornecedor_preferencial_id: string | null;
   fornecedor_preferencial_nome: string | null;
+  fornecedor_cnpj: string | null;
+  lead_time_dias: number;
+  tendencia_sem: number | null;
+  qtd_contada: number | null;
+  contado_em: string | null;
   compra_12m: number;
 }
 
@@ -109,14 +114,66 @@ export async function getEstoqueMinMaxItems(unit_id: string): Promise<EstoqueMin
       .filter((id): id is string => id != null)
   )];
   const fornecedorNomeMap = new Map<string, string>();
+  const fornecedorCnpjMap = new Map<string, string>(); // id → cpf_cnpj
+  const fornecedorRaizMap = new Map<string, string>(); // id → raiz_cnpj (8 digits)
   for (let i = 0; i < fornecedorIds.length; i += 100) {
     const r = await db
       .from("everest_fornecedores")
-      .select("id,nome_fantasia,razao_social")
+      .select("id,nome_fantasia,razao_social,cpf_cnpj")
       .in("id", fornecedorIds.slice(i, i + 100));
     if (r.error) throw new Error(r.error.message);
-    for (const row of r.data as { id: string; nome_fantasia: string | null; razao_social: string | null }[]) {
+    for (const row of r.data as { id: string; nome_fantasia: string | null; razao_social: string | null; cpf_cnpj: string | null }[]) {
       fornecedorNomeMap.set(row.id, row.nome_fantasia || row.razao_social || row.id);
+      const cnpj = row.cpf_cnpj;
+      if (cnpj) {
+        fornecedorCnpjMap.set(row.id, cnpj);
+        const raiz = cnpj.replace(/\D/g, "").slice(0, 8);
+        if (raiz.length === 8) fornecedorRaizMap.set(row.id, raiz);
+      }
+    }
+  }
+
+  // Step 5b: lead_time_dias from compras_fornecedor_credito
+  const allRaizCnpjs = [...new Set(fornecedorRaizMap.values())];
+  const leadTimeMap = new Map<string, number>(); // raiz_cnpj → lead_time_dias
+  if (allRaizCnpjs.length > 0) {
+    for (let i = 0; i < allRaizCnpjs.length; i += 100) {
+      const r = await db
+        .from("compras_fornecedor_credito")
+        .select("raiz_cnpj,lead_time_dias")
+        .in("raiz_cnpj", allRaizCnpjs.slice(i, i + 100));
+      if (r.error) throw new Error(r.error.message);
+      for (const row of r.data as { raiz_cnpj: string; lead_time_dias: number }[]) {
+        leadTimeMap.set(row.raiz_cnpj, row.lead_time_dias ?? 3);
+      }
+    }
+  }
+
+  // Step 5c: tendencia_sem from mv_consumo_tendencia
+  const tendenciaMap = new Map<string, number>(); // insumo_id → tendencia_sem
+  for (let i = 0; i < itemIds.length; i += 100) {
+    const r = await db
+      .from("mv_consumo_tendencia")
+      .select("insumo_id,tendencia_sem")
+      .eq("unit_id", uid)
+      .in("insumo_id", itemIds.slice(i, i + 100));
+    if (r.error) throw new Error(r.error.message);
+    for (const row of r.data as { insumo_id: string; tendencia_sem: number }[]) {
+      tendenciaMap.set(row.insumo_id, row.tendencia_sem ?? 0);
+    }
+  }
+
+  // Step 5d: qtd_contada from compras_contagem_rapida
+  const contagemMap = new Map<string, { qtd: number; contado_em: string }>();
+  for (let i = 0; i < itemIds.length; i += 100) {
+    const r = await db
+      .from("compras_contagem_rapida")
+      .select("insumo_id,qtd,contado_em")
+      .eq("unit_id", uid)
+      .in("insumo_id", itemIds.slice(i, i + 100));
+    if (r.error) throw new Error(r.error.message);
+    for (const row of r.data as { insumo_id: string; qtd: number; contado_em: string }[]) {
+      contagemMap.set(row.insumo_id, { qtd: row.qtd, contado_em: row.contado_em });
     }
   }
 
@@ -127,6 +184,8 @@ export async function getEstoqueMinMaxItems(unit_id: string): Promise<EstoqueMin
     if (!catalog) continue;
     const minimo = minimoMap.get(insumo_id);
     const fornId = minimo?.fornecedor_preferencial_id ?? null;
+    const raiz = fornId ? (fornecedorRaizMap.get(fornId) ?? null) : null;
+    const contagem = contagemMap.get(insumo_id) ?? null;
     result.push({
       insumo_id,
       nome: catalog.descricao,
@@ -137,6 +196,11 @@ export async function getEstoqueMinMaxItems(unit_id: string): Promise<EstoqueMin
       origem_reposicao: minimo?.origem_reposicao ?? "compra",
       fornecedor_preferencial_id: fornId,
       fornecedor_preferencial_nome: fornId ? (fornecedorNomeMap.get(fornId) ?? null) : null,
+      fornecedor_cnpj: fornId ? (fornecedorCnpjMap.get(fornId) ?? null) : null,
+      lead_time_dias: raiz ? (leadTimeMap.get(raiz) ?? 3) : 3,
+      tendencia_sem: tendenciaMap.has(insumo_id) ? (tendenciaMap.get(insumo_id) ?? null) : null,
+      qtd_contada: contagem?.qtd ?? null,
+      contado_em: contagem?.contado_em ?? null,
       compra_12m,
     });
   }
