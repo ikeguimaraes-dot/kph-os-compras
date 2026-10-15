@@ -22,6 +22,7 @@ import {
   Moon,
   Network,
   PackageCheck,
+  Shield,
   ShoppingBasket,
   Sun,
   Truck,
@@ -62,6 +63,11 @@ const groups = [
   {
     label: "Operação",
     items: [
+      {
+        href: "/compras/protocolo-86",
+        label: "Protocolo 86",
+        icon: Shield,
+      },
       { href: "/compras", label: "Pedidos de compra", icon: ShoppingBasket },
       { href: "/compras/pedidos", label: "Sugestões de reposição", icon: ClipboardList },
       {

@@ -234,6 +234,54 @@ export default function SupplyClient({ mode = "rotina" }: { mode?: Mode }) {
                     r.motivo_original === "padrao_qualidade"
                       ? " · QUALIDADE"
                       : ""}
+                    {(() => {
+                      if (!r.produto_venda_ficha_id) return null;
+                      const cls = data.classeByPratoId?.get(
+                        r.produto_venda_ficha_id,
+                      );
+                      if (!cls) return null;
+                      const colors: Record<string, string> = {
+                        INEGOCIAVEL: "#dc2626",
+                        PROTEGIDO: "#d97706",
+                        GERENCIAVEL: "#ca8a04",
+                        LIVRE: "#16a34a",
+                      };
+                      const label: Record<string, string> = {
+                        INEGOCIAVEL: "INEGOCIÁVEL",
+                        PROTEGIDO: "PROTEGIDO",
+                        GERENCIAVEL: "GERENCIÁVEL",
+                        LIVRE: "LIVRE",
+                      };
+                      return (
+                        <>
+                          {" "}
+                          <span
+                            style={{
+                              color: colors[cls],
+                              fontWeight: 600,
+                              fontSize: "0.75em",
+                            }}
+                          >
+                            {label[cls] ?? cls}
+                          </span>
+                          {cls === "INEGOCIAVEL" &&
+                            !r.retomada_cozinha_em && (
+                              <span
+                                style={{
+                                  background: "#dc2626",
+                                  color: "#fff",
+                                  borderRadius: 3,
+                                  padding: "0 4px",
+                                  fontSize: "0.7em",
+                                  marginLeft: 4,
+                                }}
+                              >
+                                INCIDENTE
+                              </span>
+                            )}
+                        </>
+                      );
+                    })()}
                   </summary>
                   <p>
                     {r.observacao || r.motivo_original} · turno {r.periodo} ·
