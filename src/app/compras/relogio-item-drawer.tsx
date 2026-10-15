@@ -242,9 +242,8 @@ export default function RelógioItemDrawer({
 
   useEffect(() => {
     if (!itemId) {
-      setData(null);
-      setLoadError("");
-      setSimPct(0);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setData(null); setLoadError(""); setSimPct(0);
       return;
     }
     let alive = true;
