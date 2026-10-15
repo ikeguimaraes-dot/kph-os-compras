@@ -2,6 +2,7 @@
 import { useState, useCallback, useRef } from "react";
 import type { PedidoSugerido, TendenciaItem } from "@/lib/compras/pedido-sugerido-actions";
 import { upsertContagemRapida } from "@/lib/compras/pedido-sugerido-actions";
+import RelógioItemDrawer from "@/app/compras/relogio-item-drawer";
 
 const fmt = (n: number, dec = 2) =>
   n.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: dec });
@@ -19,16 +20,38 @@ function VariacaoCell({ pct }: { pct: number | null }) {
   );
 }
 
+type Zona = "CRITICO" | "FORA_DO_PRUMO" | "PEDIR_AGORA" | "TRANQUILO";
+
+const ZONA_CFG: Record<Zona, { label: string; color: string; bg: string }> = {
+  CRITICO:       { label: "CRÍTICO",       color: "#b91c1c", bg: "#fee2e2" },
+  FORA_DO_PRUMO: { label: "FORA DO PRUMO", color: "#b45309", bg: "#fef3c7" },
+  PEDIR_AGORA:   { label: "PEDIR AGORA",   color: "#1d4ed8", bg: "#dbeafe" },
+  TRANQUILO:     { label: "TRANQUILO",     color: "#15803d", bg: "#dcfce7" },
+};
+
+const ZONA_ORDER: Record<Zona, number> = {
+  CRITICO: 0, FORA_DO_PRUMO: 1, PEDIR_AGORA: 2, TRANQUILO: 3,
+};
+
+function calcZona(qtd: number, minima: number, pp: number, cob: number): Zona {
+  if (cob <= 1) return "CRITICO";
+  if (qtd <= minima) return "FORA_DO_PRUMO";
+  if (qtd <= pp) return "PEDIR_AGORA";
+  return "TRANQUILO";
+}
+
 function GrupoTable({
   itens,
   contagens,
   onContagem,
   unitId,
+  onItemClick,
 }: {
   itens: TendenciaItem[];
   contagens: Map<string, number>;
   onContagem: (insumo_id: string, qtd: number, unitId: string) => void;
   unitId: string;
+  onItemClick: (insumo_id: string) => void;
 }) {
   return (
     <div style={{ overflowX: "auto" }}>
@@ -41,6 +64,9 @@ function GrupoTable({
                 ["Tendência/sem", "right", 110],
                 ["Variação", "right", 90],
                 ["Estoque contado", "right", 130],
+                ["Cobertura", "right", 90] as [string, "right", number],
+                ["Zona", "left", 120] as [string, "left", number],
+                ["Aperto", "right", 90] as [string, "right", number],
                 ["Sugestão/sem", "right", 110],
               ] as [string, "left" | "right", number][]
             ).map(([label, align, w]) => (
@@ -71,7 +97,7 @@ function GrupoTable({
               ? Math.max(0, item.sugestao_sem - contado)
               : item.sugestao_sem;
             return (
-              <tr key={item.insumo_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+              <tr key={item.insumo_id} style={{ cursor: "pointer", borderBottom: "1px solid #f3f4f6" }} onClick={() => onItemClick(item.insumo_id)}>
                 <td style={{ padding: "10px 12px" }}>
                   <span style={{ fontWeight: 500 }}>{item.nome}</span>
                   {item.unidade_medida && (
@@ -98,6 +124,53 @@ function GrupoTable({
                       })}
                     </span>
                   )}
+                </td>
+                {/* Cobertura */}
+                <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+                  {(() => {
+                    const contado = contagens.has(item.insumo_id)
+                      ? contagens.get(item.insumo_id)!
+                      : (item.estoque_contado ?? null);
+                    if (contado == null || item.tendencia_sem <= 0) return <span style={{ color: "#d1d5db" }}>—</span>;
+                    const consumoDia = item.tendencia_sem / 7;
+                    return `${(contado / consumoDia).toFixed(1)}d`;
+                  })()}
+                </td>
+                {/* Zona */}
+                <td style={{ padding: "10px 12px" }}>
+                  {(() => {
+                    const contado = contagens.has(item.insumo_id)
+                      ? contagens.get(item.insumo_id)!
+                      : (item.estoque_contado ?? null);
+                    if (contado == null || item.tendencia_sem <= 0) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
+                    const consumoDia = item.tendencia_sem / 7;
+                    const cobertura = contado / consumoDia;
+                    const pontoPedido = item.qtd_minima + consumoDia * item.lead_time_dias;
+                    const zona = calcZona(contado, item.qtd_minima, pontoPedido, cobertura);
+                    return (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 99,
+                        color: ZONA_CFG[zona].color, background: ZONA_CFG[zona].bg,
+                        display: "inline-block", whiteSpace: "nowrap",
+                      }}>
+                        {ZONA_CFG[zona].label}
+                      </span>
+                    );
+                  })()}
+                </td>
+                {/* Aperto */}
+                <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>
+                  {(() => {
+                    const contado = contagens.has(item.insumo_id)
+                      ? contagens.get(item.insumo_id)!
+                      : (item.estoque_contado ?? null);
+                    if (contado == null || item.tendencia_sem <= 0) return "—";
+                    const consumoDia = item.tendencia_sem / 7;
+                    const cobertura = contado / consumoDia;
+                    const d = new Date();
+                    d.setDate(d.getDate() + Math.round(cobertura) - item.lead_time_dias);
+                    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+                  })()}
                 </td>
                 <td
                   style={{
@@ -168,6 +241,7 @@ export function PedidoSugeridoClient({
 }) {
   const [contagens, setContagens] = useState<Map<string, number>>(new Map());
   const [saving, setSaving] = useState<Set<string>>(new Set());
+  const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
 
   const handleContagem = useCallback(
     async (insumo_id: string, qtd: number, uid: string) => {
@@ -204,7 +278,24 @@ export function PedidoSugeridoClient({
       <SectionHeader title="PEDIDO SUGERIDO DO MÊS" count={totalItens} />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-        {pedido.grupos.map((grupo) => (
+        {pedido.grupos.map((grupo) => {
+          const sortedItens = [...grupo.itens].sort((a, b) => {
+            const contagemA = contagens.has(a.insumo_id) ? contagens.get(a.insumo_id)! : (a.estoque_contado ?? null);
+            const contagemB = contagens.has(b.insumo_id) ? contagens.get(b.insumo_id)! : (b.estoque_contado ?? null);
+
+            const getZonaOrder = (item: typeof a, qtd: number | null): number => {
+              if (qtd == null || item.tendencia_sem <= 0) return 4;
+              const consumoDia = item.tendencia_sem / 7;
+              const pp = item.qtd_minima + consumoDia * item.lead_time_dias;
+              return ZONA_ORDER[calcZona(qtd, item.qtd_minima, pp, qtd / consumoDia)];
+            };
+
+            const orderA = getZonaOrder(a, contagemA);
+            const orderB = getZonaOrder(b, contagemB);
+            return orderA !== orderB ? orderA - orderB : b.tendencia_sem - a.tendencia_sem;
+          });
+
+          return (
           <div key={grupo.fornecedor_id ?? grupo.fornecedor_nome}>
             {/* Supplier header */}
             <div
@@ -233,14 +324,23 @@ export function PedidoSugeridoClient({
             </div>
 
             <GrupoTable
-              itens={grupo.itens}
+              itens={sortedItens}
               contagens={contagens}
               onContagem={handleContagem}
               unitId={unitId}
+              onItemClick={setDrawerItemId}
             />
           </div>
-        ))}
+          );
+        })}
       </div>
+
+      <RelógioItemDrawer
+        itemId={drawerItemId}
+        unitId={unitId}
+        onClose={() => setDrawerItemId(null)}
+        onLeadTimeChange={(_id, _lt) => { /* lead time update will reflect on next drawer open */ }}
+      />
 
       <RefreshFooter ultimoRefresh={pedido.ultimo_refresh} saving={saving.size > 0} />
     </section>

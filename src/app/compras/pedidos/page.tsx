@@ -60,7 +60,7 @@ export default async function PedidosSugestoesPage() {
         <>
           <PedidoSugeridoClient pedido={pedidoSugerido} unitId={unit.id} />
           <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "8px 0 32px" }} />
-          <PedidosSugestoesClient sugestoes={sugestoes} unitName={unit.name} />
+          <PedidosSugestoesClient sugestoes={sugestoes} unitName={unit.name} unitId={unit.id} />
         </>
       )}
     </div>

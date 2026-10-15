@@ -18,6 +18,8 @@ export interface TendenciaItem {
   contado_em: string | null;
   fornecedor_id: string | null;
   fornecedor_nome: string;
+  fornecedor_cnpj: string | null;
+  lead_time_dias: number;
 }
 
 export interface GrupoFornecedor {
@@ -123,14 +125,38 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
     ),
   ];
   const preferredNomeMap = new Map<string, string>();
+  const preferredCnpjMap = new Map<string, string>(); // id → cpf_cnpj
+  const preferredRaizMap = new Map<string, string>(); // id → raiz_cnpj
   for (let i = 0; i < preferredIds.length; i += 100) {
     const r = await db
       .from("everest_fornecedores")
-      .select("id,nome_fantasia,razao_social")
+      .select("id,nome_fantasia,razao_social,cpf_cnpj")
       .in("id", preferredIds.slice(i, i + 100));
     if (r.error) throw new Error(r.error.message);
-    for (const row of r.data as { id: string; nome_fantasia: string | null; razao_social: string | null }[]) {
-      preferredNomeMap.set(row.id, row.nome_fantasia || row.razao_social || row.id);
+    for (const row of r.data as { id: string; nome_fantasia: string | null; razao_social: string | null; cpf_cnpj: string | null }[]) {
+      const rowTyped = row as { id: string; nome_fantasia: string | null; razao_social: string | null; cpf_cnpj: string | null };
+      preferredNomeMap.set(rowTyped.id, rowTyped.nome_fantasia || rowTyped.razao_social || rowTyped.id);
+      if (rowTyped.cpf_cnpj) {
+        preferredCnpjMap.set(rowTyped.id, rowTyped.cpf_cnpj);
+        const raiz = rowTyped.cpf_cnpj.replace(/\D/g, "").slice(0, 8);
+        if (raiz.length === 8) preferredRaizMap.set(rowTyped.id, raiz);
+      }
+    }
+  }
+
+  // Step 4b: lead_time_dias by raiz_cnpj
+  const preferredRaizValues = [...new Set(preferredRaizMap.values())];
+  const ltMap = new Map<string, number>(); // raiz_cnpj → lead_time_dias
+  if (preferredRaizValues.length > 0) {
+    for (let i = 0; i < preferredRaizValues.length; i += 100) {
+      const r = await db
+        .from("compras_fornecedor_credito")
+        .select("raiz_cnpj,lead_time_dias")
+        .in("raiz_cnpj", preferredRaizValues.slice(i, i + 100));
+      if (r.error) throw new Error(r.error.message);
+      for (const row of r.data as { raiz_cnpj: string; lead_time_dias: number }[]) {
+        ltMap.set(row.raiz_cnpj, row.lead_time_dias ?? 3);
+      }
     }
   }
 
@@ -243,6 +269,14 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
       contado_em: contagem?.contado_em ?? null,
       fornecedor_id,
       fornecedor_nome,
+      fornecedor_cnpj: prefId ? (preferredCnpjMap.get(prefId) ?? null) : null,
+      lead_time_dias: (() => {
+        if (prefId) {
+          const raiz = preferredRaizMap.get(prefId);
+          return raiz ? (ltMap.get(raiz) ?? 3) : 3;
+        }
+        return 3;
+      })(),
     });
   }
 

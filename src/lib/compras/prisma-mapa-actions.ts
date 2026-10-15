@@ -96,6 +96,7 @@ export async function saveMapCredit(raw: unknown) {
       limite_rs: z.number().finite().min(0).max(1e12).nullable(),
       prazo_dias_acordado: z.number().int().min(0).max(365).nullable(),
       observacao: z.string().trim().max(1000),
+      lead_time_dias: z.number().int().min(1).max(90).default(3),
     })
     .parse(raw);
   const { db, user, unitIds } = await comprasAccess();
@@ -129,6 +130,7 @@ export async function saveMapCredit(raw: unknown) {
   return r.data as {
     limite_rs: number | null;
     prazo_dias_acordado: number | null;
+    lead_time_dias: number;
     observacao: string;
   };
 }
@@ -141,7 +143,7 @@ export async function getMapSupplierDetail(raw: {
   const [credit, balance] = await Promise.all([
     db
       .from("compras_fornecedor_credito")
-      .select("limite_rs,prazo_dias_acordado,observacao")
+      .select("limite_rs,prazo_dias_acordado,lead_time_dias,observacao")
       .eq("raiz_cnpj", v.root)
       .maybeSingle(),
     db

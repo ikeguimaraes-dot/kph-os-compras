@@ -11,9 +11,26 @@ import {
   type OrigemReposicao,
 } from "@/lib/compras/estoque-minmax-actions";
 import "../../../components/compras/sources.css";
+import RelógioItemDrawer from "@/app/compras/relogio-item-drawer";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+type Zona = "CRITICO" | "FORA_DO_PRUMO" | "PEDIR_AGORA" | "TRANQUILO";
+
+const ZONA_CFG: Record<Zona, { label: string; color: string; bg: string }> = {
+  CRITICO:       { label: "CRÍTICO",       color: "#b91c1c", bg: "#fee2e2" },
+  FORA_DO_PRUMO: { label: "FORA DO PRUMO", color: "#b45309", bg: "#fef3c7" },
+  PEDIR_AGORA:   { label: "PEDIR AGORA",   color: "#1d4ed8", bg: "#dbeafe" },
+  TRANQUILO:     { label: "TRANQUILO",     color: "#15803d", bg: "#dcfce7" },
+};
+
+function calcZona(qtd: number, minima: number, pp: number, cob: number): Zona {
+  if (cob <= 1) return "CRITICO";
+  if (qtd <= minima) return "FORA_DO_PRUMO";
+  if (qtd <= pp) return "PEDIR_AGORA";
+  return "TRANQUILO";
+}
 
 type Status = { label: string; color: string };
 
@@ -78,6 +95,7 @@ export default function EstoqueMinMaxTab({
   const [rows, setRows] = useState<RowState[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [drawerItemId, setDrawerItemId] = useState<string | null>(null);
   const searchTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
@@ -310,6 +328,10 @@ export default function EstoqueMinMaxTab({
                   <th>Status</th>
                   <th>Origem</th>
                   <th>Fornecedor pref.</th>
+                  <th style={{ textAlign: "right", whiteSpace: "nowrap", padding: "7px 12px", color: "#6b7280", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 }}>Cobertura</th>
+                  <th style={{ textAlign: "right", whiteSpace: "nowrap", padding: "7px 12px", color: "#6b7280", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 }}>Ponto ped.</th>
+                  <th style={{ padding: "7px 12px", color: "#6b7280", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 }}>Zona</th>
+                  <th style={{ textAlign: "right", whiteSpace: "nowrap", padding: "7px 12px", color: "#6b7280", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 }}>Aperto</th>
                   <th>Compra 12m</th>
                 </tr>
               </thead>
@@ -329,7 +351,11 @@ export default function EstoqueMinMaxTab({
                   };
 
                   return (
-                    <tr key={row.item.insumo_id}>
+                    <tr
+                      key={row.item.insumo_id}
+                      style={{ cursor: "pointer", borderBottom: "1px solid #f3f4f6" }}
+                      onClick={() => setDrawerItemId(row.item.insumo_id)}
+                    >
                       <td>
                         <span style={{ fontWeight: 500 }}>{row.item.nome}</span>
                         {row.error && (
@@ -519,6 +545,56 @@ export default function EstoqueMinMaxTab({
                           </ul>
                         )}
                       </td>
+                      {(() => {
+                        const qtd = row.item.qtd_contada;
+                        const tend = row.item.tendencia_sem;
+                        const minima = row.item.qtd_minima;
+                        const leadT = row.item.lead_time_dias;
+                        const dash = <span style={{ color: "#9ca3af" }}>—</span>;
+
+                        if (qtd == null || tend == null || tend <= 0 || minima == null) {
+                          return (
+                            <>
+                              <td style={{ padding: "10px 12px", textAlign: "right" }}>{dash}</td>
+                              <td style={{ padding: "10px 12px", textAlign: "right" }}>{dash}</td>
+                              <td style={{ padding: "10px 12px" }}>{dash}</td>
+                              <td style={{ padding: "10px 12px", textAlign: "right" }}>{dash}</td>
+                            </>
+                          );
+                        }
+
+                        const consumoDia = tend / 7;
+                        const cobertura = qtd / consumoDia;
+                        const pontoPedido = minima + consumoDia * leadT;
+                        const zona = calcZona(qtd, minima, pontoPedido, cobertura);
+                        const cfg = ZONA_CFG[zona];
+
+                        const apertoDate = new Date();
+                        apertoDate.setDate(apertoDate.getDate() + Math.round(cobertura) - leadT);
+                        const aperto = apertoDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+                        return (
+                          <>
+                            <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 12, whiteSpace: "nowrap" }}>
+                              {cobertura.toFixed(1)}d
+                            </td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+                              {pontoPedido.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 99,
+                                color: cfg.color, background: cfg.bg, display: "inline-block", whiteSpace: "nowrap",
+                              }}>
+                                {cfg.label}
+                              </span>
+                            </td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 11, color: "#6b7280" }}>
+                              {aperto}
+                            </td>
+                          </>
+                        );
+                      })()}
                       <td>
                         <span style={{ fontSize: 12, color: "#6b7280" }}>
                           {brl(row.item.compra_12m)}/ano
@@ -535,6 +611,20 @@ export default function EstoqueMinMaxTab({
           </div>
         </>
       )}
+      <RelógioItemDrawer
+        itemId={drawerItemId}
+        unitId={unit}
+        onClose={() => setDrawerItemId(null)}
+        onLeadTimeChange={(insumo_id, newLeadTime) => {
+          setRows((prev) =>
+            prev.map((r) =>
+              r.item.insumo_id === insumo_id
+                ? { ...r, item: { ...r.item, lead_time_dias: newLeadTime } }
+                : r
+            )
+          );
+        }}
+      />
     </div>
   );
 }
