@@ -507,3 +507,59 @@ export async function deletePurchaseOrder(
     return { ok: false, error: e instanceof Error ? e.message : "Erro" };
   }
 }
+
+// ── Lead Time por CNPJ ───────────────────────────────────────
+
+function _extractRaiz(cnpj: string): string {
+  return cnpj.replace(/\D/g, "").slice(0, 8);
+}
+
+export async function getLeadTimeByCnpj(cnpj: string): Promise<number> {
+  "use server";
+  const raiz = _extractRaiz(cnpj);
+  if (raiz.length < 8) return 3;
+  try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return 3;
+    const { data, error } = await supabase
+      .from("compras_fornecedor_credito")
+      .select("lead_time_dias")
+      .eq("raiz_cnpj", raiz)
+      .maybeSingle();
+    if (error) {
+      console.error("[getLeadTimeByCnpj]", error.message);
+      return 3;
+    }
+    const row = data as { lead_time_dias: number | null } | null;
+    return row?.lead_time_dias ?? 3;
+  } catch (e) {
+    console.error("[getLeadTimeByCnpj] exceção:", e);
+    return 3;
+  }
+}
+
+export async function saveLeadTimeByCnpj(
+  cnpj: string,
+  days: number,
+): Promise<ActionResult<void>> {
+  "use server";
+  try {
+    const raiz = _extractRaiz(cnpj);
+    if (raiz.length < 8) return { ok: false, error: "CNPJ inválido" };
+    const d = Math.max(1, Math.min(90, Math.round(days)));
+    await requireUser();
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return { ok: false, error: "Supabase indisponível" };
+    const { error } = await supabase
+      .from("compras_fornecedor_credito")
+      .upsert(
+        { raiz_cnpj: raiz, lead_time_dias: d } as never,
+        { onConflict: "raiz_cnpj" },
+      );
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/compras/fornecedores");
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
+  }
+}
