@@ -1101,6 +1101,7 @@ function SupplierDrawer({
   const [limit, setLimit] = useState(""),
     [term, setTerm] = useState(""),
     [note, setNote] = useState(""),
+    [leadTime, setLeadTime] = useState("3"),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
@@ -1126,6 +1127,9 @@ function SupplierDrawer({
             : String(d.credit.prazo_dias_acordado),
         );
         setNote(d.credit?.observacao ?? "");
+        setLeadTime(
+          d.credit?.lead_time_dias == null ? "3" : String(d.credit.lead_time_dias),
+        );
       })
       .catch((e) => active && setError(e.message));
     return () => {
@@ -1250,6 +1254,7 @@ function SupplierDrawer({
                 limite_rs: limit === "" ? null : Number(limit),
                 prazo_dias_acordado: term === "" ? null : Number(term),
                 observacao: note,
+                lead_time_dias: leadTime === "" ? 3 : Math.max(1, Math.min(90, Number(leadTime) || 3)),
               });
               setSavedLimit(r.limite_rs);
             }, "Limite e prazo gravados.");
@@ -1278,6 +1283,27 @@ function SupplierDrawer({
               disabled={!data.canEditCredit || !detail}
             />
           </label>
+          <div style={{ marginTop: 12 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>
+              Lead time (dias de entrega)
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="90"
+              value={leadTime}
+              onChange={(e) => setLeadTime(e.target.value)}
+              disabled={!data.canEditCredit || !detail}
+              style={{
+                width: 80,
+                padding: "4px 8px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                fontSize: 13,
+              }}
+              title="Prazo de entrega em dias — usado para calcular o ponto de pedido"
+            />
+          </div>
           <label>
             Observação
             <input
