@@ -128,4 +128,46 @@ export type SupplyRows = {
     dias_atraso: number | null;
     conciliar: boolean | null;
   };
+  v_86_protecao_prato: {
+    unit_id: string;
+    produto_id: string;
+    nome_venda_key: string;
+    nome: string | null;
+    receita_12m: number | null;
+    classe_abc: string;
+    assinatura: boolean;
+    grupo: string | null;
+    teto_86_simultaneo: number | null;
+    critica: boolean;
+    classe_86: string;
+  };
+  v_86_episodio_mes: {
+    unit_id: string;
+    episodio_id: string;
+    produto_venda_ficha_id: string;
+    data_inicio: string;
+    mes_episodio: string;
+    aberto: boolean;
+    dias_em_falta: number;
+  };
+  v_86_heranca_insumo: {
+    unit_id: string;
+    insumo_id: string;
+    nome_insumo: string;
+    n_pratos_protegidos: number;
+    receita_protegida: number | null;
+    classe_herdada: string;
+  };
+  compras_86_categoria: {
+    unit_id: string;
+    grupo: string;
+    teto_86_simultaneo: number;
+    critica: boolean;
+  };
+  compras_86_prato: {
+    unit_id: string;
+    prato: string;
+    assinatura: boolean;
+    observacao: string | null;
+  };
 };

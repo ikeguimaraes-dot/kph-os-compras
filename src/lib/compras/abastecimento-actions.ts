@@ -90,6 +90,7 @@ export async function getSupply(unit: string | null, mode: string = "rotina") {
     contribution,
     approvals,
     targets,
+    protecao,
   ] = await Promise.all([
     readAll(db, "v_abastecimento_fila", unitIds),
     readAll(db, "abastecimento_acordo", unitIds),
@@ -115,6 +116,7 @@ export async function getSupply(unit: string | null, mode: string = "rotina") {
       )
       .limit(1000),
     db.from("abastecimento_metas").select("*"),
+    readAll(db, "v_86_protecao_prato", unitIds, "produto_id"),
   ]);
   if (targets.error) throw new Error(targets.error.message);
   if (config.error || approvals.error)
@@ -186,6 +188,11 @@ export async function getSupply(unit: string | null, mode: string = "rotina") {
     ),
     founder: role(user, ["founder"], null),
     today: today(),
+    classeByPratoId: new Map(
+      (protecao as { produto_id: string; classe_86: string }[]).map(
+        (p) => [p.produto_id, p.classe_86],
+      ),
+    ),
   };
 }
 export async function saveSupply(raw: unknown) {
