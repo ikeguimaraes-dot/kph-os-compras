@@ -1,0 +1,307 @@
+.page {
+  --red: #a53b32;
+  --amber: #885815;
+  --green: #285440;
+  --blue: #416179;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 6px 0 40px;
+  color: var(--foreground);
+}
+:global(.dark) .page {
+  --red: #f2a497;
+  --amber: #e0bc7e;
+  --green: #aacaad;
+  --blue: #a1c6de;
+}
+.page button,
+.page select {
+  cursor: pointer;
+}
+.page svg {
+  flex-shrink: 0;
+}
+.page :is(button, a, select):focus-visible {
+  outline: 2px solid var(--ghos-green);
+  outline-offset: 3px;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 32px;
+  padding: 12px 0 32px;
+}
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 1.7px;
+  font-weight: 600;
+  color: var(--ghos-green);
+  margin: 0 0 18px;
+}
+.header h1 {
+  font:
+    400 clamp(40px, 4vw, 60px)/1.06 var(--font-display, Georgia),
+    Georgia,
+    serif;
+  letter-spacing: -1.8px;
+  margin: 0;
+}
+.header h1 em {
+  font-weight: 400;
+  color: var(--ghos-green);
+}
+.intro {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  line-height: 1.7;
+  margin: 17px 0 0;
+}
+.context {
+  width: 282px;
+  max-width: 100%;
+  display: grid;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  min-width: 0;
+}
+.field select {
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  width: 100%;
+  min-width: 0;
+}
+.primary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 12px 15px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #285440;
+  color: #fffdf6;
+  text-decoration: none;
+}
+.primary:hover {
+  background: #1c422f;
+}
+.body {
+  display: grid;
+  gap: 18px;
+}
+.loading,
+.error {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+  padding: 22px 20px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.error {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 40%, var(--border));
+}
+.error button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  border-radius: 6px;
+  padding: 7px 11px;
+  font: inherit;
+  font-size: 12px;
+}
+.alerts {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+.alert {
+  border: 1px solid color-mix(in srgb, var(--red) 45%, var(--border));
+  background: color-mix(in srgb, var(--red) 7%, var(--card));
+  border-radius: 9px;
+  padding: 16px 18px;
+}
+.alert h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--red);
+}
+.alert ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.alert strong {
+  font-weight: 600;
+}
+.houses {
+  display: grid;
+  gap: 16px;
+}
+.house {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+  padding: 20px;
+}
+.houseHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.houseHeader h2 {
+  margin: 0;
+  font:
+    400 24px/1.2 var(--font-display, Georgia),
+    Georgia,
+    serif;
+  letter-spacing: -0.5px;
+}
+.houseMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  flex-wrap: wrap;
+}
+.dateBadge {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+}
+.dateBadge[data-stale] {
+  color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 50%, var(--border));
+  background: color-mix(in srgb, var(--amber) 9%, var(--card));
+}
+.items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+}
+.item {
+  padding: 10px 2px;
+  border-top: 1px solid var(--border);
+}
+.itemMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.itemMain strong {
+  font-weight: 600;
+}
+.causa {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.grupo {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.obs {
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+.badge[data-class="INEGOCIAVEL"] {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 55%, var(--border));
+  background: color-mix(in srgb, var(--red) 10%, var(--card));
+}
+.badge[data-class="PROTEGIDO"] {
+  color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 55%, var(--border));
+  background: color-mix(in srgb, var(--amber) 10%, var(--card));
+}
+.badge[data-class="GERENCIAVEL"] {
+  color: var(--blue);
+  border-color: color-mix(in srgb, var(--blue) 50%, var(--border));
+}
+.repor {
+  margin-top: 16px;
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--border));
+  background: color-mix(in srgb, var(--amber) 7%, var(--card));
+  border-radius: 9px;
+  padding: 12px 16px 6px;
+}
+.repor h3 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.repor .item {
+  border-top-color: color-mix(in srgb, var(--amber) 25%, var(--border));
+}
+@media (max-width: 860px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 20px;
+  }
+  .context {
+    width: 100%;
+  }
+}
