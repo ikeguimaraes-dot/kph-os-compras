@@ -170,4 +170,27 @@ export type SupplyRows = {
     assinatura: boolean;
     observacao: string | null;
   };
+  v_pulso_86: {
+    op_86_id: string;
+    unit_id: string;
+    casa: string;
+    data: string;
+    item: string;
+    setor: string | null;
+    tipo: "86" | "85";
+    causa: string | null;
+    observacao: string | null;
+    classe_86: string | null;
+    grupo: string | null;
+    receita_12m: number | null;
+    em_acompanhamento: boolean;
+  };
+  v_pulso_86_teto: {
+    unit_id: string;
+    casa: string;
+    grupo: string;
+    teto: number;
+    n_86: number;
+    estourado: boolean;
+  };
 };

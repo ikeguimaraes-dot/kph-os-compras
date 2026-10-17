@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ThemeProvider, useTheme } from "next-themes";
 import { useRef } from "react";
 import {
+  Activity,
   ArrowUpRight,
   BookOpen,
   Boxes,
@@ -63,6 +64,11 @@ const groups = [
   {
     label: "Operação",
     items: [
+      {
+        href: "/compras/pulso-86",
+        label: "Pulso 86",
+        icon: Activity,
+      },
       {
         href: "/compras/protocolo-86",
         label: "Protocolo 86",
