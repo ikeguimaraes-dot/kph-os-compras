@@ -4,6 +4,7 @@ import { getSugestoesReposicao } from "@/lib/compras/pedidos-sugestoes-actions";
 import { getPedidoSugeridoDoMes } from "@/lib/compras/pedido-sugerido-actions";
 import { PedidosSugestoesClient } from "./pedidos-sugestoes-client";
 import { PedidoSugeridoClient } from "./pedido-sugerido-client";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,9 @@ export default async function PedidosSugestoesPage() {
 
       {unit && (
         <>
+          <p style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 8, marginBottom: 24 }}>
+            <Link href="/compras" style={{ fontWeight: 600, textDecoration: "underline" }}>Abrir planejamento pelas vendas · 4, 8 e 12 semanas →</Link>
+          </p>
           <PedidoSugeridoClient pedido={pedidoSugerido} unitId={unit.id} />
           <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "8px 0 32px" }} />
           <PedidosSugestoesClient sugestoes={sugestoes} unitName={unit.name} unitId={unit.id} />

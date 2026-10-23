@@ -6,6 +6,9 @@ import { listPurchaseOrders } from "@/app/compras/actions";
 import { getCurrentUnit } from "@kph/auth/unit";
 import { requireUser } from "@kph/auth/server";
 import { ComprasClient } from "./compras-client";
+import { Suspense } from "react";
+import { PlanejamentoSection } from "./planejamento-section";
+import "./planejamento.css";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +82,13 @@ export default async function ComprasPage() {
         </div>
       </header>
 
-      <ComprasClient orders={orders} />
+      <Suspense fallback={<div role="status" className="plan-notice">Carregando vendas e fichas das janelas de 4, 8 e 12 semanas…</div>}>
+        <PlanejamentoSection unitId={unit?.id ?? null} />
+      </Suspense>
+      <details className="plan-legacy" open={orders.length > 0}>
+        <summary>Pedidos emitidos · {orders.length}</summary>
+        <ComprasClient orders={orders} />
+      </details>
     </div>
   );
 }
