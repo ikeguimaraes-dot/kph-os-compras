@@ -8,6 +8,7 @@ import { requireUser } from "@kph/auth/server";
 import { ComprasClient } from "./compras-client";
 import { Suspense } from "react";
 import { PlanejamentoSection } from "./planejamento-section";
+import { SemanaSection } from "./semana-section";
 import "./planejamento.css";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +83,9 @@ export default async function ComprasPage() {
         </div>
       </header>
 
+      <Suspense fallback={<div role="status" className="plan-notice">Carregando lista operacional da semana…</div>}>
+        <SemanaSection unitId={unit?.id ?? null} />
+      </Suspense>
       <Suspense fallback={<div role="status" className="plan-notice">Carregando vendas e fichas das janelas de 4, 8 e 12 semanas…</div>}>
         <PlanejamentoSection unitId={unit?.id ?? null} />
       </Suspense>
