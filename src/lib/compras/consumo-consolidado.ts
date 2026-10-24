@@ -1,5 +1,5 @@
 export type Coverage = {id:string;d4:number;d8:number;d12:number};
-export type Consumption = {unit_id:string;item:number;nome:string;unidade:string;q4:number|null;q8:number|null;q12:number|null;w4:number|null;w8:number|null;w12:number|null;pendencias:number};
+export type Consumption = {unit_id:string;item:number;nome:string;unidade:string;subgrupo?:string|null;q4:number|null;q8:number|null;q12:number|null;w4:number|null;w8:number|null;w12:number|null;pendencias:number};
 export function consolidateConsumption(units:Coverage[],items:Consumption[]):Consumption[]{
  const allowed=new Set(units.map(u=>u.id));
  const groups=new Map<string,Consumption[]>();
