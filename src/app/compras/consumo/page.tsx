@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { comprasAccess } from '@/lib/compras/everest-access';
 import '../planejamento.css';
+import { consolidateConsumption } from '@/lib/compras/consumo-consolidado';
 export const dynamic='force-dynamic';
 type Unit={id:string;name:string;d4:number;d8:number;d12:number;atualizado_em:string|null;documentos:number};
 type Item={unit_id:string;item:number;nome:string;unidade:string;q4:number|null;q8:number|null;q12:number|null;w4:number|null;w8:number|null;w12:number|null;pendencias:number};
@@ -14,9 +15,11 @@ export default async function ConsumoPage({searchParams}:{searchParams:Promise<R
  if(error||!raw||!Array.isArray(raw.units)||!Array.isArray(raw.items))return <main><h1>Consumo registrado no Everest</h1><p>Consulta temporariamente indisponível. Não utilizar zero como consumo.</p><Link href="/compras">Voltar</Link></main>;
  const data=raw as Data;
  const term=typeof q.q==='string'?q.q.trim().toLocaleLowerCase('pt-BR'):'';
- const items=data.items.filter(i=>!term||`${i.nome} ${i.item}`.toLocaleLowerCase('pt-BR').includes(term));
+ const consolidated=q.visao==='grupo';
+ const source=consolidated?consolidateConsumption(data.units,data.items):data.items;
+ const items=source.filter(i=>!term||`${i.nome} ${i.item}`.toLocaleLowerCase('pt-BR').includes(term));
  const page=Math.max(1,Math.min(Math.ceil(items.length/60)||1,Number.parseInt(String(q.p??'1'),10)||1));
- const href=(p:number)=>'/compras/consumo?'+new URLSearchParams({q:term,casa:typeof q.casa==='string'?q.casa:'',p:String(p)});
+ const href=(p:number)=>'/compras/consumo?'+new URLSearchParams({q:term,visao:consolidated?'grupo':'casas',casa:typeof q.casa==='string'?q.casa:'',p:String(p)});
  return <main style={{maxWidth:1100,margin:'0 auto',padding:16}}>
   <Link href="/compras">← Compras</Link> · <Link href="/compras/estoque/everest">Estoque por depósito</Link>
   <h1 style={{fontSize:28,margin:'18px 0 8px'}}>Consumo registrado no Everest</h1>
@@ -30,7 +33,10 @@ export default async function ConsumoPage({searchParams}:{searchParams:Promise<R
     <Link href={'/compras/consumo?casa='+u.id}>Ver esta casa</Link>
    </article>)}
   </div>
+  <p><Link href="/compras/consumo?visao=grupo">Consolidado das casas autorizadas</Link> · <Link href="/compras/consumo">Detalhar por casa</Link></p>
+  {consolidated&&<p>Itens somados por código Everest e unidade de medida. A média consolidada só aparece com cobertura completa das {data.units.length} casas desta consulta.</p>}
   <form method="get" style={{display:'flex',gap:12,flexWrap:'wrap',margin:'18px 0'}}>
+   <input type="hidden" name="visao" value={consolidated?"grupo":"casas"}/>
    <input type="hidden" name="casa" value={typeof q.casa==='string'?q.casa:''}/>
    <label>Buscar ingrediente <input name="q" defaultValue={term} placeholder="Nome ou código" style={{padding:8,border:'1px solid #888',borderRadius:6}}/></label>
    <button type="submit" style={{padding:8,border:'1px solid #888',borderRadius:6}}>Buscar</button>
@@ -40,7 +46,7 @@ export default async function ConsumoPage({searchParams}:{searchParams:Promise<R
   <p>{items.length} combinações de casa, ingrediente e unidade · página {page}</p>
   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:12}}>
    {items.slice((page-1)*60,page*60).map(i=><article key={`${i.unit_id}:${i.item}:${i.unidade}`} style={{border:'1px solid var(--border, #888)',borderRadius:12,padding:16}}>
-    <small>{data.units.find(u=>u.id===i.unit_id)?.name} · Item {i.item}</small><h2>{i.nome}</h2>
+    <small>{consolidated?'Consolidado das casas desta consulta':data.units.find(u=>u.id===i.unit_id)?.name} · Item {i.item}</small><h2>{i.nome}</h2>
     <p>Média semanal registrada ({i.unidade})</p>
     <p>4 semanas: <strong>{value(i.w4)}</strong></p><p>8 semanas: <strong>{value(i.w8)}</strong></p><p>12 semanas: <strong>{value(i.w12)}</strong></p>
     <small>Total válido recebido em até 12 semanas: {value(i.q12)} {i.unidade}</small>
