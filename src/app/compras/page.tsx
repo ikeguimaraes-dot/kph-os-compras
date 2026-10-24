@@ -68,6 +68,7 @@ export default async function ComprasPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link href="/compras/consumo" className={buttonVariants({ variant: "outline" })}>Consumo Everest</Link>
           <Link href="/compras/estoque/everest" className={buttonVariants({ variant: "outline" })}>Estoque Everest</Link>
           <Link href="/compras/prisma" className={buttonVariants({ variant: "outline" })}>Prisma de Compras</Link>
           <Link
