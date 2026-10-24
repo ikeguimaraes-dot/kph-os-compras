@@ -15,3 +15,8 @@ test('pending units and duplicate source rows block totals',()=>{
  assert.equal(consolidateConsumption(units,[{...row('a'),pendencias:1}])[0].w8,null);
  assert.equal(consolidateConsumption(units,[row('a'),row('a')])[0].q8,null);
 });
+
+test('a house with missing PDV days blocks consolidated totals even with no item row',()=>{
+ const r=consolidateConsumption([units[0],{...units[1],dias_venda_sem_baixa:['2026-10-21']}],[row('a')])[0];
+ assert.equal(r.w8,null);
+});
