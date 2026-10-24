@@ -3,7 +3,7 @@ import { comprasAccess } from '@/lib/compras/everest-access';
 import '../planejamento.css';
 import { consolidateConsumption } from '@/lib/compras/consumo-consolidado';
 export const dynamic='force-dynamic';
-type Unit={id:string;name:string;d4:number;d8:number;d12:number;atualizado_em:string|null;documentos:number;ultimo_pdv?:string|null};
+type Unit={id:string;name:string;d4:number;d8:number;d12:number;atualizado_em:string|null;documentos:number;ultimo_pdv?:string|null;dias_venda_sem_baixa?:string[]};
 type Item={unit_id:string;item:number;nome:string;unidade:string;subgrupo?:string|null;q4:number|null;q8:number|null;q12:number|null;w4:number|null;w8:number|null;w12:number|null;pendencias:number};
 type Data={as_of:string;units:Unit[];items:Item[]};
 const fmt=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:3});
@@ -33,6 +33,7 @@ export default async function ConsumoPage({searchParams}:{searchParams:Promise<R
     <small>{u.documentos} documentos no período, incluindo outros tipos e cancelados.</small>
     <p>{u.atualizado_em?'Última janela recebida: '+new Date(u.atualizado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'Aguardando importação'}</p>
     <p>Última baixa PDV recebida: {u.ultimo_pdv?u.ultimo_pdv.split('-').reverse().join('/'):'A confirmar'}</p>
+    {!!u.dias_venda_sem_baixa?.length&&<div className="plan-notice"><strong>Conferir integração:</strong> há venda no Lorean sem baixa PDV recebida em {u.dias_venda_sem_baixa.map(d=>d.split('-').reverse().join('/')).join(', ')}. As médias afetadas ficam pendentes. A conferência é por data, não comprova todos os turnos.</div>}
     <Link href={'/compras/consumo?casa='+u.id}>Ver esta casa</Link>
    </article>)}
   </div>
