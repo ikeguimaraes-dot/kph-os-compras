@@ -1,0 +1,12 @@
+create table units(id uuid primary key,name text,active boolean,lorean_code text);
+create table everest_itens(id uuid primary key,cd_item text,everest_codigo integer,descricao text,unidade_medida text,subgrupo text);
+create table purchase_orders(id uuid primary key,unit_id uuid,data_prevista date,status text);
+create table purchase_order_items(id uuid primary key,order_id uuid,quantidade numeric,quantidade_recebida numeric);
+create table everest_estoque_movimentos(unit_id uuid,empresa integer,concluido_em timestamptz,registros jsonb);
+create table lorean_workdays(id uuid,unit_id uuid,data date,qualidade_suspeito boolean,turno text,receita_bruta numeric);
+create table lorean_produtos_dia(workday_id_fk uuid,produto text,grupo text);
+create table everest_estoque_saldos(unit_id uuid,empresa integer,deposito integer,registros jsonb,concluido_em timestamptz);
+create table v_preco_medio_compra(unit_id uuid,item_id uuid,preco_medio numeric);
+create table posicao_86_item(id uuid,insumo_id uuid);
+create function posicao_86_em(timestamptz) returns table(unit_id uuid,item_id uuid,motivo text) language sql as $$select null::uuid,null::uuid,null::text where false$$;
+create function posicao_86_imutavel() returns trigger language plpgsql as $$begin raise exception 'imutavel';end$$;

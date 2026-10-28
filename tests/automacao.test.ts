@@ -1,0 +1,15 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {calculateOrder,type AutomationInput} from '../src/lib/compras/automacao';
+const base=():AutomationInput=>({demand:[{date:'2026-10-28',quantity:10,samples:8},{date:'2026-10-29',quantity:20,samples:8}],stock:{quantity:8,observedAt:'2026-10-28T10:00:00Z',validated:true},incoming:[{date:'2026-10-29',quantity:5,confirmed:true}],incomingComplete:true,pack:6,minimumPacks:2,safety:3,leadDays:1,portion:1,qualityBlocked:false,now:'2026-10-28T11:00:00Z'});
+test('líquido usa demanda, segurança, estoque, entrega e embalagem',()=>{const r=calculateOrder(base());assert.equal(r.quantity,24);assert.equal(r.packs,4);assert.equal(r.state,'85');assert.equal(r.firstShortage,'2026-10-28');});
+test('saldo não comprovado não vira zero nem 86',()=>{const i=base();i.stock!.validated=false;const r=calculateOrder(i);assert.equal(r.quantity,null);assert.equal(r.state,'nao_comprovado');});
+test('estoque antigo bloqueia o pedido',()=>{const i=base();i.stock!.observedAt='2026-10-27T10:00:00Z';assert.equal(calculateOrder(i).quantity,null);});
+test('86 numérico exige porção comprovada',()=>{const i=base();i.stock!.quantity=0;i.portion=null;assert.notEqual(calculateOrder(i).state,'86');i.portion=1;assert.equal(calculateOrder(i).state,'86');});
+test('qualidade prevalece mesmo com saldo',()=>{const i=base();i.qualityBlocked=true;i.stock!.quantity=100;assert.equal(calculateOrder(i).state,'86');assert.equal(calculateOrder(i).quantity,null);});
+test('pedido desconhecido impede duplicação de compra',()=>{const i=base();i.incomingComplete=false;assert.equal(calculateOrder(i).quantity,null);});
+test('amostra insuficiente não vira média zero',()=>{const i=base();i.demand[0]!.samples=1;assert.equal(calculateOrder(i).demand,null);});
+test('entrega posterior não resolve falta anterior',()=>{const i=base();i.incoming[0]!.quantity=100;const r=calculateOrder(i);assert.equal(r.quantity,0);assert.equal(r.firstShortage,'2026-10-28');});
+test('sem falta não força pedido mínimo',()=>{const i=base();i.stock!.quantity=100;assert.equal(calculateOrder(i).packs,0);});
+test('números inválidos bloqueiam cálculo',()=>{const i=base();i.pack=NaN;assert.equal(calculateOrder(i).quantity,null);i.pack=1;i.incoming[0]!.quantity=-1;assert.equal(calculateOrder(i).quantity,null);});
+test('entrega tardia dentro do prazo não esconde falta hoje no 85',()=>{const i=base();i.incoming[0]!.quantity=100;assert.equal(calculateOrder(i).state,'85');});
