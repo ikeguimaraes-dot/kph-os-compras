@@ -17,6 +17,7 @@ export default async function AutomationPage({searchParams}:{searchParams:Promis
  const href=(p:number)=>'/compras/automacao?'+new URLSearchParams({q:term,filtro:String(q.filtro??''),casa:typeof q.casa==='string'?q.casa:'',p:String(p)});
  return <main style={{maxWidth:1180,margin:'auto',padding:16}}>
  <Link href="/compras">← Compras</Link><h1>Pedidos calculados e exceções</h1>
+ <p>{typeof q.casa==='string'&&q.casa?'Visão da casa filtrada':'Visão consolidada das casas operacionais autorizadas'}</p>
  <p>Consumo da integração oficial Everest por dia da semana. Necessidade = demanda + segurança − saldo utilizável − entregas confirmadas, ajustada à embalagem.</p>
  <p>Referência: {data.asOf} · {data.items.length} insumos e bases · <strong>{ready.length} sugestões líquidas calculadas</strong>. Nenhum pedido enviado automaticamente nesta tela.</p>
  <p><Link href="/compras/automacao/exportar">Exportar cálculo e evidências (JSON)</Link> · <Link href="/compras/estoque/everest">Conferir fontes de estoque</Link></p>
