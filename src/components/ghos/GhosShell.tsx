@@ -6,6 +6,7 @@ import { ThemeProvider, useTheme } from "next-themes";
 import { useRef } from "react";
 import {
   Activity,
+  Orbit,
   ArrowUpRight,
   BookOpen,
   Boxes,
@@ -39,6 +40,7 @@ const groups = [
     label: "Visão & direção",
     items: [
       { href: "/compras/inicio", label: "Início", icon: LayoutDashboard },
+      { href: "/compras/atlas", label: "Atlas", icon: Orbit },
       {
         href: "/compras/prisma",
         label: "Prisma de margem",
