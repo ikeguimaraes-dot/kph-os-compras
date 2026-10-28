@@ -20,9 +20,9 @@ const nonnegative = (v: number | null): v is number => finite(v) && v >= 0;
 export function calculateOrder(input: AutomationInput): AutomationResult {
   const errors: string[] = [];
   const now = Date.parse(input.now);
-  const demandOk = input.demand.length > 0 && input.demand.every(d => nonnegative(d.quantity) && d.samples >= 4 && /^\d{4}-\d{2}-\d{2}$/.test(d.date))
+  const demandOk = input.demand.length > 0 && input.demand.every(d => nonnegative(d.quantity) && /^\d{4}-\d{2}-\d{2}$/.test(d.date))
     && new Set(input.demand.map(d => d.date)).size === input.demand.length;
-  if (!demandOk) errors.push('demanda_sem_amostra_suficiente');
+  if (!demandOk || input.demand.some(d=>d.samples<4)) errors.push('demanda_sem_amostra_suficiente');
   const demand = demandOk ? input.demand.reduce((s,d)=>s+d.quantity!,0) : null;
   const stock = input.stock;
   const stockOk = !!stock && stock.validated && nonnegative(stock.quantity) && Number.isFinite(now)
@@ -45,7 +45,7 @@ export function calculateOrder(input: AutomationInput): AutomationResult {
   let state: AutomationResult['state'] = 'nao_comprovado';
   if (input.qualityBlocked) state='86';
   else if (stockOk && finite(input.portion) && input.portion>0 && stock!.quantity<input.portion) state='86';
-  if (stockOk && demandOk && input.incomingComplete && incomingOk && input.leadDays!==null && input.leadDays>=0) {
+  if (stockOk && demandOk && input.demand.every(d=>d.samples>=4) && input.incomingComplete && incomingOk && input.leadDays!==null && input.leadDays>=0) {
     let balance=stock!.quantity;
     for (const day of [...input.demand].sort((a,b)=>a.date.localeCompare(b.date))) {
       balance+=arrivals.filter(r=>r.date===day.date).reduce((s,r)=>s+r.quantity,0);

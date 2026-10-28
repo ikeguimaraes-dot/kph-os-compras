@@ -9,7 +9,10 @@ export type AutomationRow = {
  fonte_atualizada_em:string|null; ultimo_pdv:string|null; lacuna_pdv_recente:boolean; preco_medio:number|null; bloqueio_qualidade:boolean;
 };
 export async function getAutomation(unit?:string|null) {
- const {db,unitIds,units}=await comprasAccess(unit);
+ const {db,unitIds:allowedIds,units}=await comprasAccess(unit);
+ const active=await db.from('units').select('id').in('id',allowedIds).eq('active',true).eq('is_training',false).not('lorean_code','is',null);
+ if(active.error)throw new Error('Não foi possível determinar as casas operacionais.');
+ const unitIds=active.data.map(u=>u.id as string);
  const snapshots=await Promise.all(unitIds.map(async id=>{
   const r=await db.from('compras_automacao_execucao').select('resultado,criado_em').eq('unit_id',id).order('criado_em',{ascending:false}).limit(1).maybeSingle();
   if(r.error)throw new Error('Não foi possível ler a conciliação automática.');
