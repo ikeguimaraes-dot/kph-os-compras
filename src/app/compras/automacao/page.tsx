@@ -18,7 +18,7 @@ export default async function AutomationPage({searchParams}:{searchParams:Promis
  <Link href="/compras">← Compras</Link><h1>Pedidos calculados e exceções</h1>
  <p>Consumo da integração oficial Everest por dia da semana. Necessidade = demanda + segurança − saldo utilizável − entregas confirmadas, ajustada à embalagem.</p>
  <p>Referência: {data.asOf} · {data.items.length} insumos e bases · <strong>{ready.length} sugestões líquidas calculadas</strong>. Nenhum pedido enviado automaticamente nesta tela.</p>
- <p><Link href="/api/compras/automacao">Exportar cálculo e evidências (JSON)</Link> · <Link href="/compras/estoque/everest">Conferir fontes de estoque</Link></p>
+ <p><Link href="/compras/automacao/exportar">Exportar cálculo e evidências (JSON)</Link> · <Link href="/compras/estoque/everest">Conferir fontes de estoque</Link></p>
  <section aria-label="Cobertura por casa" style={{display:'flex',flexWrap:'wrap',gap:16}}>{data.units.map(u=>{const c=data.coverage.find(c=>c.id===u.id);return <article key={u.id} style={{border:'1px solid var(--border)',padding:16,borderRadius:8}}><h2>{u.name}</h2>{c?<p>{c.dias_conciliados} dias conciliados / {c.dias_vendas} com venda</p>:<p>Sem leitura automática desta casa. Não representa zero.</p>}<p>{c?.dias_eventos??0} dias com eventos separados da média regular</p><Link href={'/compras/automacao?casa='+u.id}>Filtrar casa</Link></article>;})}</section>
  <h2>Exceções por área</h2><p>Dados ausentes geram uma pendência explícita. Não são interpretados como estoque zero ou autorização de compra.</p>
  <ul>{[...exceptions].map(([e,count])=><li key={e}>{reasons[e]??e}: <strong>{count}</strong> itens</li>)}</ul>
