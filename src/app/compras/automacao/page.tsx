@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import {getAutomation} from '@/lib/compras/automacao-actions';
+import {createServiceClient} from '@kph/db/supabase/server';
+import type {SupabaseClient} from '@supabase/supabase-js';
 export const dynamic='force-dynamic';
 export const runtime='nodejs';
 const fmt=new Intl.NumberFormat('pt-BR',{maximumFractionDigits:3});
@@ -14,10 +16,18 @@ export default async function AutomationPage({searchParams}:{searchParams:Promis
  const exceptions=new Map<string,number>();for(const i of data.items)for(const e of i.result.exceptions)exceptions.set(e,(exceptions.get(e)??0)+1);
  const filtered=data.items.filter(i=>(!term||i.nome.toLocaleLowerCase('pt-BR').includes(term))&&(q.filtro!=='prontos'||(i.result.quantity!==null&&i.result.quantity>0)));
  const page=Math.max(1,Math.min(Math.ceil(filtered.length/50)||1,Number.parseInt(String(q.p??'1'),10)||1));
+ const visible=filtered.slice((page-1)*50,page*50);
+ const db=createServiceClient() as unknown as SupabaseClient|null;
+ // Scope comes from getAutomation's authorization, never from a query-string UUID alone.
+ const references=db&&visible.length?await db.from('compras_automacao_referencia_comercial')
+  .select('unit_id,item_id,fornecedor,everest_cd_fornecedor,nr_nota,dt_lancamento,unidade_compra,unidade_destino,fator_conversao,preco_base,conversao_consistente')
+  .in('unit_id',data.units.map(u=>u.id)).in('item_id',visible.map(i=>i.item_id))
+  .order('dt_lancamento',{ascending:false}).limit(501):null;
  const href=(p:number)=>'/compras/automacao?'+new URLSearchParams({q:term,filtro:String(q.filtro??''),casa:typeof q.casa==='string'?q.casa:'',p:String(p)});
  return <main style={{maxWidth:1180,margin:'auto',padding:16}}>
  <Link href="/compras">← Compras</Link><h1>Pedidos calculados e exceções</h1>
  <p>{typeof q.casa==='string'&&q.casa?'Visão da casa filtrada':'Visão consolidada das casas operacionais autorizadas'}</p>
+ <p>Geração automática com validação por amostragem por Ike e Ale. Bloqueios comerciais ficam para a V2; referências históricas não representam cotação vigente.</p>
  <p>Consumo da integração oficial Everest por dia da semana. Necessidade = demanda + segurança − saldo utilizável − entregas confirmadas, ajustada à embalagem.</p>
  <p>Referência: {data.asOf} · {data.items.length} insumos e bases · <strong>{ready.length} sugestões líquidas calculadas</strong>. Nenhum pedido enviado automaticamente nesta tela.</p>
  <p><Link href="/compras/automacao/exportar">Exportar cálculo e evidências (JSON)</Link> · <Link href="/compras/estoque/everest">Conferir fontes de estoque</Link></p>
@@ -28,5 +38,14 @@ export default async function AutomationPage({searchParams}:{searchParams:Promis
  <p>{filtered.length} itens · página {page}</p>
  <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Insumo / casa</th><th>Demanda</th><th>Estoque</th><th>Entregas</th><th>Comprar</th><th>Conferência</th></tr></thead><tbody>{filtered.slice((page-1)*50,page*50).map(i=><tr key={i.unit_id+':'+i.item_id}><td>{i.nome}<br/><small>{data.units.find(u=>u.id===i.unit_id)?.name} · {i.medida}</small></td><td>{n(i.result.demand)}<br/><small>{i.demand.length} dias · referência histórica</small><details><summary>Médias e amostras</summary>{i.medias.map(m=><p key={m.dow}>{weekdays[m.dow]}: {n(m.quantity)} {i.medida} · {m.samples} dias</p>)}</details></td><td>{n(i.result.stock)}</td><td>{n(i.result.incoming)}</td><td><strong>{n(i.result.quantity)}</strong><br/><small>{i.result.packs===null?'':n(i.result.packs)+' embalagens'}</small></td><td>{i.result.state==='nao_comprovado'?'Posição não comprovada':i.result.state}<br/>{i.result.firstShortage&&<small>Falta projetada: {i.result.firstShortage}<br/></small>}{i.result.exceptions.map(e=><small key={e}>{reasons[e]??e}<br/></small>)}</td></tr>)}</tbody></table></div>
  <nav aria-label="Paginação">{page>1&&<Link href={href(page-1)}>← Anterior</Link>} {page*50<filtered.length&&<Link href={href(page+1)}>Próxima →</Link>}</nav>
+ <section aria-label="Referências de compra no Everest"><h2>Compras anteriores dos itens desta página</h2>
+ <p>Fornecedor, preço por unidade de estoque e conversão observados nas notas reais. A conversão não define lote mínimo nem prazo de entrega.</p>
+ {!references||references.error?<p>Referências indisponíveis nesta consulta.</p>:<>
+ {references.data.length>500&&<p>Exibindo as 500 referências mais recentes desta página. Filtre um insumo para conferir suas referências.</p>}
+ {visible.map(i=>{const refs=references.data.slice(0,500).filter(r=>r.unit_id===i.unit_id&&r.item_id===i.item_id);return <details key={i.unit_id+':'+i.item_id}><summary>{i.nome} · {data.units.find(u=>u.id===i.unit_id)?.name} · {refs.length} referências exibidas</summary>
+ {!refs.length&&<p>Sem referência exibida nesta consulta; não significa ausência de compra.</p>}
+ {refs.map((r,index)=><p key={index}>{r.fornecedor??`Fornecedor Everest ${r.everest_cd_fornecedor}`} · nota {r.nr_nota} · {r.dt_lancamento} · R$ {n(r.preco_base)}/{r.unidade_destino} · 1 {r.unidade_compra} = {n(r.fator_conversao)} {r.unidade_destino} · {r.conversao_consistente?'conversão consistente nas notas':'conversão requer conciliação'}</p>)}
+ </details>;})}</>}
+ </section>
  </main>;
 }
