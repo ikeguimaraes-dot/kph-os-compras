@@ -1,3 +1,4 @@
+import { PosicaoSection } from "@/app/compras/posicao-section";
 import { Newsreader, Instrument_Sans } from "next/font/google";
 import { getMap } from "@/lib/compras/prisma-mapa-actions";
 import MapClient from "./map-client";
@@ -21,6 +22,7 @@ export default async function MapPage({
   );
   return (
     <div className={`${serif.variable} ${sans.variable}`}>
+      <PosicaoSection />
       <MapClient data={data} initial={initial} />
     </div>
   );
