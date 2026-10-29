@@ -5,9 +5,10 @@ import * as T from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {zones,houseColors,houseShare,num,type Layer,type TwinHouse,type Zone,type TwinNetwork,type ScaleBasis,type RouteMode,type TwinActivity} from './model';
 import {buildNetwork} from './NetworkWorld';
+import type {AtlasOrder} from '@/lib/atlas/model';
 import {createLife} from './Life';
 
-type Props={activity?:TwinActivity;weekday:number;showLabels:boolean;network?:TwinNetwork;basis:ScaleBasis;routeMode:RouteMode;facility:string|null;speed:number;houses:TwinHouse[];house:TwinHouse|null;zone:Zone|null;layer:Layer;night:boolean;animate:boolean;reset:number;zoom:number;onSelect:(id:string)=>void};
+type Props={orders?:AtlasOrder[];activity?:TwinActivity;weekday:number;showLabels:boolean;network?:TwinNetwork;basis:ScaleBasis;routeMode:RouteMode;facility:string|null;speed:number;houses:TwinHouse[];house:TwinHouse|null;zone:Zone|null;layer:Layer;night:boolean;animate:boolean;reset:number;zoom:number;onSelect:(id:string)=>void};
 type Anchor={id:string;name:string;point:T.Vector3;detail:string};
 const palette={wall:'#e5e3d8',concrete:'#cfcec4',metal:'#91a0a1',dark:'#394d45',wood:'#b58b60',leaf:'#658571',orange:'#eb855b'};
 
@@ -160,7 +161,7 @@ export default function Scene(props:Props){
   // A floating base gives the model a crafted, physical quality.
   box(world,0,-1.02,0,groupView?62:22,.3,groupView?48:18,'#adb7a9');
   const nextAnchors:Anchor[]=[];
-  const networkWorld=groupView?buildNetwork({world,houses:props.houses,network:props.network,basis:props.basis,makeHouse,picks,life}):null;
+  const networkWorld=groupView?buildNetwork({world,houses:props.houses,network:props.network,basis:props.basis,makeHouse,picks,life,orders:props.orders}):null;
   if(networkWorld){
    nextAnchors.push(...networkWorld.anchors);
   }else{
@@ -189,7 +190,7 @@ export default function Scene(props:Props){
   const pick=(e:PointerEvent)=>{
    if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>5)return;
    const bounds=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-bounds.left)/bounds.width*2-1,-(e.clientY-bounds.top)/bounds.height*2+1);
-   ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects(picks,false)[0];if(hit)current.current.onSelect(hit.object.userData.node);
+   ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects(picks.filter(o=>{let node:T.Object3D|null=o;while(node){if(!node.visible)return false;node=node.parent;}return true;}),false)[0];if(hit)current.current.onSelect(hit.object.userData.node);
   };
   renderer.domElement.addEventListener('pointerdown',onDown);renderer.domElement.addEventListener('pointerup',pick);
   const direction=start.clone().normalize();
@@ -241,6 +242,7 @@ export default function Scene(props:Props){
    controls.update();renderer.render(scene,camera);
    for(const anchor of nextAnchors){
     const el=labels.current[anchor.id];if(!el)continue;
+    el.style.display=anchor.id.startsWith('order:')&&(p.routeMode!=='pedidos'||!p.showLabels&&p.facility!==anchor.id||!!p.facility&&p.facility!==anchor.id)?'none':'';
     projected.copy(anchor.point).project(camera);
     el.style.left=`${(projected.x*.5+.5)*root.clientWidth}px`;el.style.top=`${(-projected.y*.5+.5)*root.clientHeight}px`;
     el.style.opacity=projected.z<1?'1':'0';el.style.pointerEvents=projected.z<1?'auto':'none';

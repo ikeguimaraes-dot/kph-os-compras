@@ -1,12 +1,13 @@
 import * as T from 'three';
+import {orderProgress,type AtlasOrder} from '@/lib/atlas/model';
 import type {createLife} from './Life';
 import {houseColors,houseScale,houseShare,num,type TwinHouse,type TwinNetwork,type ScaleBasis,type RouteMode} from './model';
 
 export type NetworkAnchor={id:string;name:string;point:T.Vector3;detail:string};
-type Options={world:T.Group;houses:TwinHouse[];network?:TwinNetwork;basis:ScaleBasis;makeHouse:(parent:T.Object3D,color:string,detailed:boolean,houseId:string,houseName:string)=>T.Object3D;picks:T.Object3D[];life:ReturnType<typeof createLife>};
+type Options={orders?:AtlasOrder[];world:T.Group;houses:TwinHouse[];network?:TwinNetwork;basis:ScaleBasis;makeHouse:(parent:T.Object3D,color:string,detailed:boolean,houseId:string,houseName:string)=>T.Object3D;picks:T.Object3D[];life:ReturnType<typeof createLife>};
 const supplierColors=['#4f7666','#a97659','#8d9d5e','#6d8299'];
 
-export function buildNetwork({world,houses,network,basis,makeHouse,picks,life}:Options){
+export function buildNetwork({world,houses,network,basis,makeHouse,picks,life,orders}:Options){
  const textures:T.Texture[]=[];
  const mats=new Map<string,T.MeshStandardMaterial>();
  const mat=(c:string)=>{if(!mats.has(c))mats.set(c,new T.MeshStandardMaterial({color:c,roughness:.75}));return mats.get(c)!;};
@@ -34,7 +35,7 @@ export function buildNetwork({world,houses,network,basis,makeHouse,picks,life}:O
   const share=houseShare(network,h.id,basis);
   anchors.push({id:h.id,name:h.name.replace(' SP Itaim',''),point:new T.Vector3(21,3.5,zs[i]!+3),detail:basis==='equal'?'Entrar na casa':`${num((share??0)*100)}% · ${basis==='revenue'?'receita bruta':'itens vendidos'}`});
  });
- const suppliers=[...(network?.suppliers??[])].sort((a,b)=>['61559589','18293459','45950502','02814340'].indexOf(a.id)-['61559589','18293459','45950502','02814340'].indexOf(b.id));
+ const suppliers=[...(network?.suppliers??[])].slice(0,4);
  suppliers.forEach((s,i)=>{
   const g=new T.Group();g.position.set(-22,-.3,zs[i]!);world.add(g);const color=supplierColors[i]!;
   const pad=box(g,0,-.05,0,11,.2,8,'#b7c2ae');pad.userData.node=s.id;picks.push(pad);
@@ -50,7 +51,7 @@ export function buildNetwork({world,houses,network,basis,makeHouse,picks,life}:O
    for(let r=0;r<4;r++)for(let c=0;c<6;c++){box(g,-4+c*1.5,-.06,-4.5-r*.38,1.1,.14,.25,'#8b9867');cyl(g,-4+c*1.5,.13,-4.5-r*.38,.14,.25,'#a8b77e');}
   }else{cyl(g,4,1.1,-1, .7,2.5,'#b5c6bd');cyl(g,4,1.1,-3,.7,2.5,'#b5c6bd');}
   life.dock(g,2.5,2, i);
-  anchors.push({id:s.id,name:s.label,point:new T.Vector3(-22,4,zs[i]!+2),detail:`${num(s.kg/1000,2)} t em KG · ${s.invoices} notas`});
+  anchors.push({id:s.id,name:s.label,point:new T.Vector3(-22,4,zs[i]!+2),detail:s.purchaseOnly?`R$ ${num(s.spend,0)} em compras`:`${num(s.kg/1000,2)} t em KG · ${s.invoices} notas`});
  });
  // Central production facility: cutaway, receiving docks, cold room, production line and dispatch.
  const factory=new T.Group();factory.position.set(-2,-.25,0);world.add(factory);
@@ -74,7 +75,7 @@ export function buildNetwork({world,houses,network,basis,makeHouse,picks,life}:O
  for(let i=0;i<25;i++){const roller=cyl(factory,4,.88,-6.8+i*.55,.12,1.9,'#a9b9aa');roller.rotation.z=Math.PI/2;}
  for(let i=0;i<3;i++){box(factory,6.7,.2,-5+i*5,2,.3,2.7,'#c2ad83');box(factory,7.7,.24,-5+i*5,.1,.03,2.7,'#e8c06d');}
  box(factory,2,.75,7,6,1,1.4,'#577967');sign(factory,'EXPEDIÇÃO',2,1.7,7.8,5,.7,'#577967');
- anchors.push({id:'factory',name:'Fábrica KPH',point:new T.Vector3(-2,5.3,4),detail:'Produção central · cenário'});
+ anchors.push({id:'factory',name:'Fábrica KPH',point:new T.Vector3(-2,5.3,4),detail:orders?'Depósitos ERP · produção possível':'Produção central · cenário'});
  life.factory(factory);
  const crates:T.Mesh[]=[];for(let i=0;i<7;i++)crates.push(box(factory,4,1.25,-6+i*2,1.3,.6,1,'#cfaf79'));
  const routes:{curve:T.CatmullRomCurve3;group:T.Group;vehicle:T.Group;mode:RouteMode;phase:number;supplier:string;house:string;cargo:T.Mesh}[]=[];
@@ -104,7 +105,20 @@ export function buildNetwork({world,houses,network,basis,makeHouse,picks,life}:O
   addRoute([[-21,sz+3],[-13,sz+3],[-13,6],[-10,6]],s.label,supplierColors[i]!,'fabrica',i*.23,s.id,'factory');
  });
  houses.forEach((h,i)=>addRoute([[6,6],[10,6],[10,zs[i]!],[16,zs[i]!]],'KPH / '+h.name.replace(' SP Itaim','').toUpperCase(),houseColors[i]!,'fabrica',i*.24,'factory',h.id));
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ const orderTrucks=(orders??[]).filter(o=>o.status!=='cancelado').slice(0,24).map((order,i)=>{
+  const si=suppliers.findIndex(s=>s.id===order.supplierId),hi=houses.findIndex(h=>h.id===order.unitId);
+  const proven=si>=0&&hi>=0&&!!order.eta&&order.status!=='rascunho';
+  const vehicle=makeTruck(order.number,proven?'#547b67':'#b58a54');
+  const curve=proven?new T.CatmullRomCurve3([[-21,zs[si]!+3],[-13,zs[si]!+3],[-13,-22],[10,-22],[10,zs[hi]!],[16,zs[hi]!]].map(([x,z])=>new T.Vector3(x!,-.15,z!)),false,'catmullrom',.08):null;
+  const p=orderProgress(order,today);vehicle.position.copy(curve?curve.getPointAt(p):new T.Vector3(-9+(i%6)*2.4,-.15,20+Math.floor(i/6)*1.6));
+  if(curve){const t=curve.getTangentAt(Math.min(.9999,p));vehicle.rotation.y=Math.atan2(-t.x,-t.z);}
+  vehicle.traverse(node=>{if(node instanceof T.Mesh){node.userData.node='order:'+order.id;picks.push(node);}});
+  anchors.push({id:'order:'+order.id,name:order.number,point:vehicle.position.clone().add(new T.Vector3(0,2,0)),detail:proven?(order.supplier??'Pedido'):'Dados pendentes · sem rota'});
+  return {vehicle,order};
+ });
  return {anchors,update:(elapsed:number,mode:RouteMode,selected:string|null,showLines:boolean,newBasis:ScaleBasis)=>{
+  orderTrucks.forEach(({vehicle,order})=>{vehicle.visible=mode==='pedidos'&&(!selected||selected==='order:'+order.id||selected===order.unitId||selected===order.supplierId);});
   buildings.forEach(({mesh,id})=>{const s=houseScale(network,id,newBasis);mesh.scale.x=T.MathUtils.lerp(mesh.scale.x,s,.08);mesh.scale.z=T.MathUtils.lerp(mesh.scale.z,s,.08);});
   crates.forEach((c,i)=>{c.position.z=-6.5+(elapsed*.85+i*2)%13;});
   routes.forEach((r)=>{

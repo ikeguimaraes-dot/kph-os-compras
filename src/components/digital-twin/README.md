@@ -1,6 +1,6 @@
 # Atlas — V3
 
-Experiência 3D exploratória em `/compras/atlas`, com laboratório local em `/lab/operacao`, criada com Three.js. Não substitui os painéis operacionais nem emite pedidos.
+Experiência 3D exploratória em `/compras/atlas`, com laboratório local em `/lab/operacao`, criada com Three.js. A V4 abre leituras operacionais rastreáveis; não emite pedidos nem altera as fontes.
 
 ## Executar
 
@@ -76,3 +76,19 @@ node scripts/atlas-package-snapshot.mjs .local/atlas-production.b64
 Configure o conteúdo desse arquivo como segredo `ATLAS_SNAPSHOT_GZIP` no projeto correto e faça novo deploy. Ausência de configuração mostra indisponibilidade, nunca dados fictícios. O laboratório continua bloqueado em produção. Não há migrations nem gravações no banco.
 
 Validação de publicação: onze testes de modelo/escopo, TypeScript, ESLint e build de produção. Os testes de escopo incluem acesso vazio, acesso a uma casa e acesso integral.
+
+
+## V4 — compras, pedidos, produção e reposição
+
+A página autenticada lê `src/lib/atlas/load.ts` com service role somente depois de `comprasAccess`. Cada consulta por casa usa os IDs autorizados, limitados às casas do Atlas. Não há API pública nova, migration ou mutação das fontes. `?ano=` aceita o ano atual e os dois anteriores; estoque e pedidos continuam sendo a posição atual, explicitamente datados.
+
+- **Compras:** cabeçalhos canônicos de `everest_notas_recebidas_atuais` + linhas elegíveis de `everest_notas_recebidas_itens`. A deduplicação de versão vem da view; totais em centavos deduplicam também a identidade da linha. Período por lançamento, sem anualização. É compra, não CMV consumido ou pagamento. Fornecedores agrupados por raiz de CNPJ válida em formato; sem identificação, preserva a identidade do cadastro. Não faz match por nome.
+- **Pedidos:** `purchase_orders`, `purchase_order_items`, `suppliers`, `compras_automacao_pedido_item`. Até 24 caminhões e todos os pedidos em cartões. Percurso exige fornecedor identificado, casa e previsão. Posição indica etapa simbólica; sem GPS. Sem esses dados, o caminhão fica estacionado. Notas recebidas não são convertidas em pedidos futuros.
+- **Produção:** `everest_estoque_depositos`/`everest_estoque_saldos`, escopo empresa + depósito + casa. Saldo válido exige coleta completa, identidade ERP, unidade coerente, quantidade não negativa, unicidade e até oito horas. Preços são referências históricas de notas, não avaliação contábil. Fichas ativas pertencentes à casa via `everest_fichas_tecnicas_custo`, versão mais recente sem empate, componentes diretos e rendimento. Aproveitamento diferente de 100% fica pendente. Potencial de bases na cadeia de proteínas, limitado por TODOS os componentes; subprodutos precisam já estar disponíveis. Capacidades isoladas não podem ser somadas se disputam o mesmo saldo.
+- **Reposição:** reutiliza `getAutomation`, com médias por dia da semana, entregas conciliadas e validações existentes. A data de pedir antecede a primeira queda abaixo da reserva mínima pelo prazo de reposição. Falta de dados e ausência de ruptura no horizonte são estados distintos. Produção é identificada separadamente de compra.
+
+Compras, pedidos e saldos são lidos a cada abertura/atualização. Proporção de vendas das casas e atividade ilustrada ainda usam o snapshot histórico V3, com cobertura explicitada. A fábrica continua uma representação: depósito Central não comprova uma fábrica física compartilhada.
+
+O payload operacional é comprimido no servidor após autorização e descomprimido no navegador (DecompressionStream). Isto evita retransmitir nomes repetidos de todo o catálogo em dezenas de milhares de saldos. Arquivos de verificação real ficam somente em `.local/`, nunca no bundle ou Git. O laboratório `?v=4` continua restrito a development + localhost.
+
+Verificação automatizada: `node --import tsx --test tests/atlas-operations.test.ts tests/digital-twin.test.ts tests/atlas-scope.test.ts`. Cobre limitação por componente, componentes repetidos, dados ausentes, centavos/deduplicação, reserva mínima/prazo/entregas, etapa de pedidos e isolamento por casa.

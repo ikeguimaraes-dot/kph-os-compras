@@ -8,8 +8,8 @@ export type TwinItem = {
 };
 export type TwinHouse={id:string;name:string;snapshotAt:string;itemCount:number;stockCount:number;items:TwinItem[];coverage:{dias_conciliados:number;dias_vendas:number;dias_eventos:number}};
 export type ScaleBasis='revenue'|'itemssold'|'equal';
-export type RouteMode='documentado'|'fabrica';
-export type TwinSupplier={id:string;name:string;label:string;kg:number;spend:number;invoices:number;volumes:{unit:string;quantity:number}[];houses:{unit_id:string;kg:number;spend:number;invoices:number}[]};
+export type RouteMode='documentado'|'fabrica'|'pedidos';
+export type TwinSupplier={purchaseOnly?:boolean;id:string;name:string;label:string;kg:number;spend:number;invoices:number;volumes:{unit:string;quantity:number}[];houses:{unit_id:string;kg:number;spend:number;invoices:number}[]};
 export type TwinNetwork={capturedAt:string;period:{from:string;to:string;days:number};commonDays:number;commonDates:string[];comparison:{id:string;days:number;revenue:number;itemssold:number}[];suppliers:TwinSupplier[]};
 export type TwinActivity={capturedAt:string;from:string;to:string;source:string;rows:{unit_id:string;dow:number;samples:number;mean_clients:number}[]};
 export type TwinData={capturedAt:string;source:string;houses:TwinHouse[];network?:TwinNetwork;activity?:TwinActivity};
