@@ -1,0 +1,1 @@
+export default function Loading(){return <section className="p-8" role="status"><h1 className="text-3xl">Pendências operacionais</h1><p className="mt-3">Conferindo os impedimentos nas fontes de compras, estoque, fichas e operação…</p></section>;}

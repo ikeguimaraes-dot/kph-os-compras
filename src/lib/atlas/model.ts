@@ -1,11 +1,12 @@
 export type AtlasCatalog={id:string;cd_item:string;everest_codigo:number;descricao:string;unidade_medida:string;grupo:string;subgrupo:string};
 export type AtlasPurchase={id:string;unitId:string;date:string;month:string;invoice:string;itemId:string|null;item:string;category:string;supplierId:string;supplier:string;value:number};
 export type AtlasOrder={id:string;unitId:string;number:string;status:string;date:string;eta:string|null;supplierId:string|null;supplier:string|null;value:number|null;lines:{id:string;name:string;unit:string;quantity:number;received:number;itemId:string|null}[]};
-export type AtlasStock={itemId:string;name:string;code:string;unit:string;category:string;group:string;quantity:number|null;usable:boolean;reason:string|null;historicalPrice:number|null;priceDate:string|null};
-export type AtlasDepot={id:string;unitId:string;company:number;code:number;name:string;at:string|null;complete:boolean;stocks:AtlasStock[]};
+export type AtlasStock={itemId:string;name:string;code:string;unit:string;category:string;group:string;quantity:number|null;usable:boolean;reason:string|null;historicalPrice:number|null;priceDate:string|null;sourceUnit?:string};
+export type AtlasDepot={id:string;unitId:string;company:number;code:number;name:string;at:string|null;complete:boolean;unidentified?:number;unidentifiedExamples?:string[];stocks:AtlasStock[]};
 export type AtlasCapacity={id:string;unitId:string;depotId:string;itemId:string;name:string;unit:string;yield:number;ready:number|null;possible:number|null;limiting:string|null;issues:string[];components:{itemId:string|null;name:string;quantity:number;available:number|null}[]};
 export type AtlasReplenishment={unitId:string;itemId:string;name:string;unit:string;group:string;category:string;stock:number|null;at:string|null;minimum:number|null;demand:number|null;shortage:string|null;orderBy:string|null;forecastOk:boolean;horizonEnd:string|null;quantity:number|null;state:string;issues:string[]};
-export type AtlasOperations={readAt:string;year:number;start:string;end:string;units:{id:string;name:string}[];purchases:AtlasPurchase[];orders:AtlasOrder[];depots:AtlasDepot[];capacity:AtlasCapacity[];replenishment:AtlasReplenishment[];warnings:string[]};
+export type AtlasPosition={unit_id:string;ultima_confirmacao:string|null;status:string;itens:{item_id:string;nome:string;identidade:string;pendencia:string|null;afetados:{produto_id:string|null;ficha_id:string|null;vinculo_ficha_pendente:boolean}[]}[]};
+export type AtlasOperations={readAt:string;year:number;start:string;end:string;units:{id:string;name:string}[];purchases:AtlasPurchase[];orders:AtlasOrder[];depots:AtlasDepot[];capacity:AtlasCapacity[];replenishment:AtlasReplenishment[];warnings:string[];positions?:AtlasPosition[];recipeChecks?:{unitId:string;id:string;itemId:string|null;name:string;issues:string[]}[]};
 export function orderState(order:AtlasOrder,today:string){
  if(order.status==='cancelado'||order.status==='recebido'||order.status==='rascunho')return order.status;
  if(!order.supplierId||!order.eta)return 'dados pendentes';

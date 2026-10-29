@@ -11,7 +11,7 @@ export const maxDuration=60;
 export const dynamic='force-dynamic';
 export const metadata={title:'Atlas'};
 
-export default async function AtlasPage({searchParams}:{searchParams:Promise<{ano?:string}>}){
+export default async function AtlasPage({searchParams}:{searchParams:Promise<{ano?:string;unit?:string;tab?:string;q?:string;depot?:string}>}){
  // Session + role-per-house checks happen before decoding or exposing data.
  const {unitIds,db,units}=await comprasAccess();
  const encoded=process.env.ATLAS_SNAPSHOT_GZIP;
@@ -29,5 +29,6 @@ export default async function AtlasPage({searchParams}:{searchParams:Promise<{an
  const year=Number.isInteger(requested)&&requested>=yearNow-2&&requested<=yearNow?requested:yearNow;
  const operationalUnits=units.filter(u=>data.houses.some(h=>h.id===u.id));
  const operations=await loadAtlasOperations(db,operationalUnits,year,getAutomation());
- return <AtlasPayload key={year} data={data} encoded={gzipSync(JSON.stringify(operations)).toString('base64')}/>;
+ const initial=Object.fromEntries(['unit','tab','q','depot'].flatMap(k=>{const v=params[k as keyof typeof params];return typeof v==='string'?[[k,v.slice(0,150)]]:[];}));
+ return <AtlasPayload initial={initial} key={JSON.stringify(initial)+year} data={data} encoded={gzipSync(JSON.stringify(operations)).toString('base64')}/>;
 }

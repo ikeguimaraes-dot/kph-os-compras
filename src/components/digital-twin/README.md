@@ -92,3 +92,16 @@ Compras, pedidos e saldos são lidos a cada abertura/atualização. Proporção 
 O payload operacional é comprimido no servidor após autorização e descomprimido no navegador (DecompressionStream). Isto evita retransmitir nomes repetidos de todo o catálogo em dezenas de milhares de saldos. Arquivos de verificação real ficam somente em `.local/`, nunca no bundle ou Git. O laboratório `?v=4` continua restrito a development + localhost.
 
 Verificação automatizada: `node --import tsx --test tests/atlas-operations.test.ts tests/digital-twin.test.ts tests/atlas-scope.test.ts`. Cobre limitação por componente, componentes repetidos, dados ausentes, centavos/deduplicação, reserva mínima/prazo/entregas, etapa de pedidos e isolamento por casa.
+
+
+## Pendências operacionais
+
+`/compras/pendencias` reúne os impedimentos detectados nas fontes operacionais, com menu compartilhado desktop/móvel. Usa `comprasAccess`, limita casas a unidades operacionais autorizadas e não depende do snapshot 3D. O Atlas usa o mesmo classificador (`src/lib/pendencias/model.ts`) e abre a fila filtrada por casa, área, causa ou insumo.
+
+A leitura cobre: exceções da conciliação automática; pedidos abertos sem fornecedor, previsão ou código ERP; atraso de entrega; depósitos incompletos/vencidos e saldos inconsistentes; saldos sem identidade ou preço consistente; cadastros das fichas ativas pertencentes às casas; capacidade das bases de proteínas por depósito; identidade nas notas do ano consultado; confirmações e vínculos da posição operacional. Não usa 85/86 por si só como falha nem trata encaminhamento para produção como erro. A capacidade permanece restrita às bases da cadeia de proteínas; não é uma auditoria de toda a empresa.
+
+IDs da fila são derivados de casa + fonte + registro + causa. Exceções repetidas são deduplicadas. Falhas gerais de coleta do depósito aparecem uma vez por depósito; falhas por item mantêm seu escopo. Um item pode ter várias ocorrências. Saldos negativos e unidades divergentes têm causas distintas. As referências de valor vêm de compras do item na casa no ano consultado e não devem ser somadas entre ocorrências; não representam perdas.
+
+Não há tabela nova nem gravação de tarefas: a fila é recalculada e sai da leitura quando a origem comprova correção. Área indicada não é uma atribuição aceita. Falha de fonte aparece como cobertura incompleta, nunca como ausência de pendências. Leituras paginadas fazem uma tentativa adicional somente para resposta HTTP 5xx. Nada deste diagnóstico altera notas, estoque, pedidos ou histórico 85/86.
+
+`tests/operational-pendings.test.ts` cobre identidade por casa, deduplicação, resolução derivada, pedidos abertos, ausência de preço versus saldo zero, falha de fonte, confirmações e fichas fora da cadeia de proteínas. Laboratório privado: `/lab/operacao?v=pendencias`, com o mesmo bloqueio de produção/host do laboratório Atlas; leitura preparada em `.local/pendencias-test.json`.

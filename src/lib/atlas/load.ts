@@ -4,10 +4,10 @@ import type {getAutomation} from '@/lib/compras/automacao-actions';
 import {categoryName} from '@/lib/compras/prisma-config';
 import {potentialProduction,replenishmentDates,type AtlasCatalog,type AtlasOperations,type AtlasDepot,type AtlasOrder,type AtlasPurchase} from './model';
 type Row=Record<string,unknown>;
-type PageResult=PromiseLike<{data:unknown[]|null;error:{message:string}|null}>;
+type PageResult=PromiseLike<{data:unknown[]|null;error:{message:string}|null;status?:number}>;
 async function all(make:(from:number,to:number)=>PageResult){
  const rows:Row[]=[];
- for(let from=0;;from+=1000){const result=await make(from,from+999);if(result.error)throw new Error(result.error.message);const page=(result.data??[]) as Row[];rows.push(...page);if(page.length<1000)break;if(from>=100000)throw new Error('Consulta excedeu o limite de leitura completa.');}
+ for(let from=0;;from+=1000){let result=await make(from,from+999);if(result.error&&(result.status??0)>=500){await new Promise(resolve=>setTimeout(resolve,400));result=await make(from,from+999);}if(result.error)throw new Error(result.error.message);const page=(result.data??[]) as Row[];rows.push(...page);if(page.length<1000)break;if(from>=100000)throw new Error('Consulta excedeu o limite de leitura completa.');}
  return rows;
 }
 const n=(v:unknown):number|null=>v===null||v===undefined||v===''?null:Number.isFinite(Number(v))?Number(v):null;
@@ -19,7 +19,7 @@ export async function loadAtlasOperations(db:SupabaseClient,units:{id:string;nam
  const start=`${year}-01-01`,end=year===Number(today.slice(0,4))?today:`${year}-12-31`;
  const warnings:string[]=[];
  const optional=async(label:string,fn:()=>Promise<Row[]>)=>{try{return await fn();}catch{warnings.push(`${label}: consulta indisponível; não representa zero.`);return [];}};
- const [catalogRows,notes,supplierRows,orders,localSuppliers,depotRows,saldoRows,costs,recipes,components,prices,automation]=await Promise.all([
+ const [catalogRows,notes,supplierRows,orders,localSuppliers,depotRows,saldoRows,costs,recipes,components,prices,automation,positions]=await Promise.all([
  all((a,b)=>db.from('everest_itens').select('id,cd_item,everest_codigo,descricao,unidade_medida,grupo,subgrupo').order('id').range(a,b)),
  all((a,b)=>db.from('everest_notas_recebidas_atuais').select('id,unit_id,fornecedor_id,nr_nota,dt_lancamento').in('unit_id',ids).gte('dt_lancamento',start).lte('dt_lancamento',end).order('id').range(a,b)),
  all((a,b)=>db.from('everest_fornecedores').select('id,unit_id,cpf_cnpj,nome_fantasia,razao_social').in('unit_id',ids).order('id').range(a,b)),
@@ -32,6 +32,7 @@ export async function loadAtlasOperations(db:SupabaseClient,units:{id:string;nam
  optional('Componentes',()=>all((a,b)=>db.from('everest_fichas_tecnicas_itens').select('id,ficha_id,insumo_id,qt_aplicada,pr_aproveitamento').order('id').range(a,b))),
  optional('Preços históricos',()=>all((a,b)=>db.from('compras_automacao_referencia_comercial').select('unit_id,item_id,preco_base,dt_lancamento,conversao_consistente').in('unit_id',ids).eq('conversao_consistente',true).lte('dt_lancamento',today).order('dt_lancamento',{ascending:false}).order('nota_item_id').range(a,b))),
  automationRead.catch(()=>{warnings.push('Projeção de reposição indisponível.');return null;}),
+ optional('Posição operacional',()=>all((a,b)=>db.from('posicao_86_atual').select('unit_id,ultima_confirmacao,status,itens').in('unit_id',ids).order('unit_id').range(a,b))),
  ]);
  const catalog=new Map((catalogRows as unknown as AtlasCatalog[]).map(i=>[i.id,i]));
  const byCode=new Map((catalogRows as unknown as AtlasCatalog[]).map(i=>[`${i.cd_item}:${i.everest_codigo}`,i]));
@@ -58,15 +59,32 @@ export async function loadAtlasOperations(db:SupabaseClient,units:{id:string;nam
   const complete=!!saldo&&n(saldo.total)===records.length&&records.every(r=>n(r.cd_empresa)===n(d.empresa)&&n(r.cd_deposito)===n(d.deposito));
   const age=saldo?.concluido_em?Date.parse(readAt)-Date.parse(s(saldo.concluido_em)):Infinity;
   const counts=new Map<string,number>();for(const r of records){const k=`${r.cd_item}:${r.id_item}`;counts.set(k,(counts.get(k)??0)+1);}
-  return {id:`${d.unit_id}:${d.empresa}:${d.deposito}`,unitId:s(d.unit_id),company:Number(d.empresa),code:Number(d.deposito),name:s(d.nome),at:saldo?.concluido_em?s(saldo.concluido_em):null,complete,stocks:records.flatMap(r=>{
+  return {id:`${d.unit_id}:${d.empresa}:${d.deposito}`,unitId:s(d.unit_id),company:Number(d.empresa),code:Number(d.deposito),name:s(d.nome),at:saldo?.concluido_em?s(saldo.concluido_em):null,complete,unidentified:records.filter(r=>!byCode.has(`${r.cd_item}:${r.id_item}`)).length,unidentifiedExamples:records.filter(r=>!byCode.has(`${r.cd_item}:${r.id_item}`)).slice(0,5).map(r=>`cd_item ${s(r.cd_item)} / id_item ${s(r.id_item)}`),stocks:records.flatMap(r=>{
    const key=`${r.cd_item}:${r.id_item}`,item=byCode.get(key);if(!item)return [];
    const quantity=n(r.qt_estoque),price=priceMap.get(`${d.unit_id}:${item.id}`);
    const reason=!complete?'Coleta incompleta':counts.get(key)!==1?'Saldo duplicado':s(r.sg_unidademedida).trim().toUpperCase()!==item.unidade_medida?.trim().toUpperCase()?'Unidade divergente':quantity===null?'Quantidade ausente':quantity<0?'Saldo negativo':!Number.isFinite(age)||age<0||age>8*3600000?'Posição desatualizada':null;
-   return [{itemId:item.id,name:item.descricao,code:item.cd_item,unit:item.unidade_medida,category:categoryName(item.grupo),group:item.subgrupo,quantity,usable:reason===null,reason,historicalPrice:price?n(price.preco_base):null,priceDate:price?s(price.dt_lancamento):null}];
+   return [{itemId:item.id,name:item.descricao,code:item.cd_item,unit:item.unidade_medida,sourceUnit:s(r.sg_unidademedida),category:categoryName(item.grupo),group:item.subgrupo,quantity,usable:reason===null,reason,historicalPrice:price?n(price.preco_base):null,priceDate:price?s(price.dt_lancamento):null}];
   })};
  });
  const componentMap=new Map<string,Row[]>();for(const c of components){const list=componentMap.get(s(c.ficha_id))??[];list.push(c);componentMap.set(s(c.ficha_id),list);}
  const memberships=new Set(costs.map(c=>`${c.unit_id}:${c.ficha_id}`));
+ const recipeChecks:NonNullable<AtlasOperations['recipeChecks']>=[];
+ for(const unit of units){
+  const groups=new Map<string,Row[]>();
+  for(const recipe of recipes){if(!memberships.has(`${unit.id}:${recipe.id}`))continue;const key=s(recipe.item_pai_id);const rs=groups.get(key)??[];rs.push(recipe);groups.set(key,rs);}
+  for(const [itemId,rs] of groups){
+   const recipe=rs.sort((a,b)=>Number(b.versao)-Number(a.versao))[0]!;
+   const cs=componentMap.get(s(recipe.id))??[],issues:string[]=[];
+   if(!catalog.has(itemId))issues.push('Produto da ficha sem identidade no catálogo');
+   if((n(recipe.qt_producao)??0)<=0)issues.push('Rendimento ausente ou inválido');
+   if(rs.filter(r=>r.versao===recipe.versao).length>1)issues.push('Mais de uma ficha ativa na mesma versão');
+   if(!cs.length)issues.push('Ficha sem componentes');
+   if(cs.some(c=>!catalog.has(s(c.insumo_id))))issues.push('Componente sem identidade no catálogo');
+   if(cs.some(c=>(n(c.qt_aplicada)??0)<=0))issues.push('Quantidade de componente ausente ou inválida');
+   if(cs.some(c=>n(c.pr_aproveitamento)!==100))issues.push('Aproveitamento requer validação');
+   if(issues.length)recipeChecks.push({unitId:unit.id,id:s(recipe.id),itemId:catalog.has(itemId)?itemId:null,name:catalog.get(itemId)?.descricao??'Ficha sem item identificado',issues});
+  }
+ }
  const capacity:AtlasOperations['capacity']=[];
  for(const depot of depots){
   const choices=new Map<string,Row[]>();for(const recipe of recipes){if(!memberships.has(`${depot.unitId}:${recipe.id}`))continue;const id=s(recipe.item_pai_id);const list=choices.get(id)??[];list.push(recipe);choices.set(id,list);}
@@ -88,5 +106,5 @@ export async function loadAtlasOperations(db:SupabaseClient,units:{id:string;nam
   const forecast=replenishmentDates({stock:r.result.stock,safety:r.seguranca,leadDays:r.lead_dias,demand:r.demand,incoming:r.entregas,exceptions:r.result.exceptions});
   return {unitId:r.unit_id,itemId:r.item_id,name:r.nome,unit:r.medida,group:r.subgrupo,category:categoryName(catalog.get(r.item_id)?.grupo??'Sem classificação'),stock:r.result.stock,at:r.observado_em,minimum:r.seguranca,demand:r.result.demand,...forecast,quantity:r.result.quantity,state:r.result.state,issues:r.result.exceptions};
  });
- return {readAt,year,start,end,units,purchases,orders:liveOrders,depots,capacity,replenishment,warnings};
+ return {readAt,year,start,end,units,purchases,orders:liveOrders,depots,capacity,replenishment,warnings,recipeChecks,positions:positions as unknown as AtlasOperations['positions']};
 }
