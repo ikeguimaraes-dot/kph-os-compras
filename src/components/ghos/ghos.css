@@ -739,3 +739,5 @@
     scroll-behavior: auto;
   }
 }
+
+.ghos-content:has(.atlas-embedded){padding:0;overflow:auto}

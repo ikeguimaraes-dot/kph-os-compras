@@ -1,3 +1,4 @@
+import { PosicaoSection } from "@/app/compras/posicao-section";
 import Link from "next/link";
 import { Plus, Truck } from "lucide-react";
 
@@ -20,6 +21,7 @@ export default async function ComprasPage() {
 
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+      <PosicaoSection />
       <header
         style={{
           display: "flex",
@@ -68,6 +70,7 @@ export default async function ComprasPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link href="/compras/automacao" className={buttonVariants({ variant: "outline" })}>Pedidos automáticos e exceções</Link>
           <Link href="/compras/consumo" className={buttonVariants({ variant: "outline" })}>Consumo Everest</Link>
           <Link href="/compras/estoque/everest" className={buttonVariants({ variant: "outline" })}>Estoque Everest</Link>
           <Link href="/compras/prisma" className={buttonVariants({ variant: "outline" })}>Prisma de Compras</Link>

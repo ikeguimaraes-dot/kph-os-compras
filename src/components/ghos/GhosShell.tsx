@@ -6,6 +6,8 @@ import { ThemeProvider, useTheme } from "next-themes";
 import { useRef } from "react";
 import {
   Activity,
+  TriangleAlert,
+  Orbit,
   ArrowUpRight,
   BookOpen,
   Boxes,
@@ -39,6 +41,7 @@ const groups = [
     label: "Visão & direção",
     items: [
       { href: "/compras/inicio", label: "Início", icon: LayoutDashboard },
+      { href: "/compras/atlas", label: "Atlas", icon: Orbit },
       {
         href: "/compras/prisma",
         label: "Prisma de margem",
@@ -64,6 +67,7 @@ const groups = [
   {
     label: "Operação",
     items: [
+      { href: "/compras/pendencias", label: "Pendências operacionais", icon: TriangleAlert },
       {
         href: "/compras/pulso-86",
         label: "Pulso 86",
