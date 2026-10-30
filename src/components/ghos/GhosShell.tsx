@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { useAuth, useUnit } from "@kph/auth/context";
 import "./ghos.css";
+import { IntegrationBell } from './IntegrationBell';
 
 const groups = [
   {
@@ -159,7 +160,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         pathname === item.href ||
         (item.href !== "/compras" && pathname.startsWith(item.href + "/")),
     );
-  const label = current?.label ?? "Pedidos de compra";
+  const label = pathname === '/compras/avisos' ? 'Avisos de integração' : current?.label ?? "Pedidos de compra";
   const navigation = (mobile = false) => (
     <>
       <div className="ghos-brand-row">
@@ -291,6 +292,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <span className="ghos-light-icon">Apagar a luz</span>
             <span className="ghos-dark-icon">Acender a luz</span>
           </button>
+          <IntegrationBell />
           <a className="ghos-ecosystem" href="/dashboard">
             KPH OS <ArrowUpRight size={13} />
           </a>
