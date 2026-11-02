@@ -1,6 +1,7 @@
 "use client";
 import { useState, useCallback, useRef } from "react";
 import type { PedidoSugerido, TendenciaItem } from "@/lib/compras/pedido-sugerido-actions";
+import { weeklyPurchaseQuantity } from "@/lib/compras/compra-fixa-semanal";
 import { upsertContagemRapida } from "@/lib/compras/pedido-sugerido-actions";
 import RelógioItemDrawer from "@/app/compras/relogio-item-drawer";
 
@@ -67,7 +68,7 @@ function GrupoTable({
                 ["Cobertura", "right", 90] as [string, "right", number],
                 ["Zona", "left", 120] as [string, "left", number],
                 ["Aperto", "right", 90] as [string, "right", number],
-                ["Sugestão/sem", "right", 110],
+                ["Comprar/sem", "right", 110],
               ] as [string, "left" | "right", number][]
             ).map(([label, align, w]) => (
               <th
@@ -93,9 +94,7 @@ function GrupoTable({
             const contado = contagens.has(item.insumo_id)
               ? contagens.get(item.insumo_id)!
               : (item.estoque_contado ?? null);
-            const ajustada = contado != null
-              ? Math.max(0, item.sugestao_sem - contado)
-              : item.sugestao_sem;
+            const ajustada = weeklyPurchaseQuantity(item.sugestao_sem, contado, item.compra_fixa_semanal);
             return (
               <tr key={item.insumo_id} style={{ cursor: "pointer", borderBottom: "1px solid #f3f4f6" }} onClick={() => onItemClick(item.insumo_id)}>
                 <td style={{ padding: "10px 12px" }}>
@@ -107,7 +106,7 @@ function GrupoTable({
                   )}
                 </td>
                 <td style={{ padding: "10px 12px", textAlign: "right", color: "#374151" }}>
-                  {fmt(item.tendencia_sem, 2)}
+                  {item.historico_disponivel ? fmt(item.tendencia_sem, 2) : "—"}
                 </td>
                 <td style={{ padding: "10px 12px", textAlign: "right" }}>
                   <VariacaoCell pct={item.variacao_pct} />
@@ -182,6 +181,9 @@ function GrupoTable({
                   }}
                 >
                   {fmt(ajustada, 2)}
+                  {item.compra_fixa_semanal != null && <span style={{ display: "block", fontSize: 11, fontWeight: 500 }}>
+                    Compra fixa semanal · {item.unidade_medida}<br />Sem desconto de estoque
+                  </span>}
                 </td>
               </tr>
             );
@@ -265,7 +267,7 @@ export function PedidoSugeridoClient({
       <section style={{ marginBottom: 40 }}>
         <SectionHeader title="PEDIDO SUGERIDO DO MÊS" count={0} />
         <p style={{ color: "#6b7280", fontSize: 13, padding: "12px 0" }}>
-          Nenhum item com tendência de consumo calculada. Configure mínimo/máximo em Estoque Mín/Máx.
+          Nenhum item com tendência elegível ou compra fixa semanal cadastrada. Confira os parâmetros de reposição.
         </p>
       </section>
     );

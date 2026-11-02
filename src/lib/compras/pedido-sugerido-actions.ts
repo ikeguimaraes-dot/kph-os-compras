@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import { comprasAccess } from "./everest-access";
+import { includeFixedItems, weeklyPurchaseQuantity } from "./compra-fixa-semanal";
 
 export interface TendenciaItem {
   insumo_id: string;
@@ -14,6 +15,8 @@ export interface TendenciaItem {
   qtd_maxima: number | null;
   // sugestao_sem = GREATEST(ceil(tendencia_sem), ceil(qtd_minima/4)), capped at ceil(qtd_maxima/4)
   sugestao_sem: number;
+  compra_fixa_semanal: number | null;
+  historico_disponivel: boolean;
   estoque_contado: number | null;
   contado_em: string | null;
   fornecedor_id: string | null;
@@ -64,23 +67,22 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
     if (r.data.length < 1000) break;
   }
 
-  if (tendRows.length === 0) return { grupos: [], ultimo_refresh: null };
-
-  const allIds = tendRows.map((r) => r.insumo_id);
+  const historyIds = new Set(tendRows.map(row => row.insumo_id));
 
   // 2. Fetch compras_estoque_minimo restricted to origem_reposicao = 'compra'
   const minimoMap = new Map<
     string,
-    { qtd_minima: number; qtd_maxima: number | null; fornecedor_preferencial_id: string | null }
+    { qtd_minima: number; qtd_maxima: number | null; fornecedor_preferencial_id: string | null; compra_fixa_semanal: number | null }
   >();
-  for (let i = 0; i < allIds.length; i += 100) {
+  for (let offset = 0; ; offset += 1000) {
     const r = await db
       .from("compras_estoque_minimo")
-      .select("insumo_id,qtd_minima,qtd_maxima,fornecedor_preferencial_id,origem_reposicao")
+      .select("insumo_id,qtd_minima,qtd_maxima,fornecedor_preferencial_id,origem_reposicao,compra_fixa_semanal")
       .eq("unit_id", uid)
       .eq("origem_reposicao", "compra")
-      .gt("qtd_minima", 0)
-      .in("insumo_id", allIds.slice(i, i + 100));
+      .or("qtd_minima.gt.0,compra_fixa_semanal.gt.0")
+      .order("insumo_id")
+      .range(offset, offset + 999);
     if (r.error) throw new Error(r.error.message);
     for (const row of r.data as {
       insumo_id: string;
@@ -88,17 +90,22 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
       qtd_maxima: number | null;
       fornecedor_preferencial_id: string | null;
       origem_reposicao: string;
+      compra_fixa_semanal: number | null;
     }[]) {
       minimoMap.set(row.insumo_id, {
+        compra_fixa_semanal: row.compra_fixa_semanal ?? null,
         qtd_minima: row.qtd_minima,
         qtd_maxima: row.qtd_maxima ?? null,
         fornecedor_preferencial_id: row.fornecedor_preferencial_id ?? null,
       });
     }
+    if (r.data.length < 1000) break;
   }
 
   // Keep only items with origem_reposicao = 'compra'
-  const filtered = tendRows.filter((r) => minimoMap.has(r.insumo_id));
+  const filtered = includeFixedItems(tendRows, minimoMap, insumo_id => ({
+    insumo_id, consumo_sem_compra: 0, consumo_sem_teorico: 0, tendencia_sem: 0, variacao_pct: null,
+  }));
   if (filtered.length === 0) return { grupos: [], ultimo_refresh: null };
 
   const filteredIds = filtered.map((r) => r.insumo_id);
@@ -230,7 +237,7 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
 
     const minimo = minimoMap.get(row.insumo_id)!;
     const tendencia = row.tendencia_sem ?? 0;
-    const sugestao_sem = calcSugestao(tendencia, minimo.qtd_minima, minimo.qtd_maxima);
+    const sugestao_sem = weeklyPurchaseQuantity(calcSugestao(tendencia, minimo.qtd_minima, minimo.qtd_maxima), null, minimo.compra_fixa_semanal);
     const contagem = contagemMap.get(row.insumo_id) ?? null;
 
     const prefId = minimo.fornecedor_preferencial_id;
@@ -265,6 +272,8 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
       qtd_minima: minimo.qtd_minima,
       qtd_maxima: minimo.qtd_maxima ?? null,
       sugestao_sem,
+      compra_fixa_semanal: minimo.compra_fixa_semanal,
+      historico_disponivel: historyIds.has(row.insumo_id),
       estoque_contado: contagem?.qtd ?? null,
       contado_em: contagem?.contado_em ?? null,
       fornecedor_id,
