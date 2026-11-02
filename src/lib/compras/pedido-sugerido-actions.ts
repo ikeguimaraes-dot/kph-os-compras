@@ -169,13 +169,13 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
     for (let i = 0; i < noPreferredIds.length; i += 100) {
       const r = await db
         .from("v_mapa_insumo")
-        .select("item_id,principal_12m")
+        .select("insumo_id,principal_12m")
         .eq("unit_id", uid)
         .not("principal_12m", "is", null)
-        .in("item_id", noPreferredIds.slice(i, i + 100));
+        .in("insumo_id", noPreferredIds.slice(i, i + 100));
       if (r.error) throw new Error(r.error.message);
-      for (const row of r.data as { item_id: string; principal_12m: string | null }[]) {
-        if (row.principal_12m) fallbackCnpjMap.set(row.item_id, row.principal_12m);
+      for (const row of r.data as { insumo_id: string; principal_12m: string | null }[]) {
+        if (row.principal_12m) fallbackCnpjMap.set(row.insumo_id, row.principal_12m);
       }
     }
   }

@@ -75,7 +75,7 @@ const groups = [
         icon: Shield,
       },
       { href: "/compras", label: "Pedidos de compra", icon: ShoppingBasket },
-      { href: "/compras/pedidos", label: "Sugestões de reposição", icon: ClipboardList },
+      { href: "/compras/pedidos", label: "Pedido automático", icon: ClipboardList },
       {
         href: "/compras/abastecimento/acordos",
         label: "Acordos & caixa",
