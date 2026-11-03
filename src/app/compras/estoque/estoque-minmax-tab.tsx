@@ -1,4 +1,6 @@
 "use client";
+import { getStockStatus as getStatus } from "@/lib/compras/stock-status";
+import EstoqueApresentacoes from "./estoque-apresentacoes";
 import { useAuth } from "@kph/auth/context";
 import { resolveUnitScope } from "@/lib/compras/unit-scope";
 import { useEffect, useRef, useState } from "react";
@@ -30,27 +32,6 @@ function calcZona(qtd: number, minima: number, pp: number, cob: number): Zona {
   if (qtd <= minima) return "FORA_DO_PRUMO";
   if (qtd <= pp) return "PEDIR_AGORA";
   return "TRANQUILO";
-}
-
-type Status = { label: string; color: string };
-
-function getStatus(
-  stock: number | null,
-  min: number | null,
-  max: number | null,
-  origem: OrigemReposicao
-): Status {
-  if (max != null && stock != null && stock > max)
-    return { label: "Acima do máx", color: "#1d6fa5" };
-  if (stock == null || stock <= 0)
-    return { label: "Zerado", color: "#b91c1c" };
-  if (min != null && stock >= min)
-    return { label: "OK", color: "#15803d" };
-  if (min != null && stock > 0 && stock < min) {
-    if (origem === "bloqueado") return { label: "Bloqueio", color: "#7c3aed" };
-    return { label: "~85%", color: "#b45309" };
-  }
-  return { label: "—", color: "#6b7280" };
 }
 
 type RowState = {
@@ -298,6 +279,7 @@ export default function EstoqueMinMaxTab({
 
   return (
     <div>
+      <EstoqueApresentacoes key={unit} unitId={unit} />
       <div className="source-filters">
         <label>
           Buscar item
@@ -358,6 +340,7 @@ export default function EstoqueMinMaxTab({
                     >
                       <td>
                         <span style={{ fontWeight: 500 }}>{row.item.nome}</span>
+                        {row.item.tem_apresentacoes && <small style={{ display: "block" }}>Consultar apresentações separadas acima</small>}
                         {row.error && (
                           <span
                             style={{
@@ -383,7 +366,7 @@ export default function EstoqueMinMaxTab({
                           min="0"
                           step="0.001"
                           value={row.minInput}
-                          disabled={row.saving}
+                          disabled={row.saving || row.item.tem_apresentacoes}
                           onChange={(e) =>
                             setRows((prev) =>
                               prev.map((r, j) =>
@@ -407,7 +390,7 @@ export default function EstoqueMinMaxTab({
                           min="0"
                           step="0.001"
                           value={row.maxInput}
-                          disabled={row.saving}
+                          disabled={row.saving || row.item.tem_apresentacoes}
                           onChange={(e) =>
                             setRows((prev) =>
                               prev.map((r, j) =>
@@ -445,7 +428,7 @@ export default function EstoqueMinMaxTab({
                       <td>
                         <select
                           value={row.origemInput}
-                          disabled={row.saving}
+                          disabled={row.saving || row.item.tem_apresentacoes}
                           onChange={(e) =>
                             handleOrigemChange(absIdx, e.target.value as OrigemReposicao)
                           }
@@ -463,7 +446,7 @@ export default function EstoqueMinMaxTab({
                           <input
                             type="text"
                             value={row.fornecedorSearch}
-                            disabled={row.saving}
+                            disabled={row.saving || row.item.tem_apresentacoes}
                             placeholder="Buscar fornecedor…"
                             onChange={(e) =>
                               handleFornecedorSearch(absIdx, e.target.value)
