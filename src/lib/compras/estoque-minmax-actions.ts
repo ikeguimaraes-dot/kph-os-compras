@@ -6,6 +6,7 @@ export type OrigemReposicao = "compra" | "transferencia" | "producao" | "bloquea
 
 export interface EstoqueMinMaxItem {
   insumo_id: string;
+  tem_apresentacoes: boolean;
   nome: string;
   unidade_medida: string | null;
   estoque_atual: number | null;
@@ -49,6 +50,45 @@ export async function getEstoqueMinMaxItems(unit_id: string): Promise<EstoqueMin
     if (r.data.length < 1000) break;
   }
 
+  // Step 4: Paginate compras_estoque_minimo — all fields
+  const minimoMap = new Map<string, {
+    qtd_minima: number | null;
+    qtd_maxima: number | null;
+    origem_reposicao: OrigemReposicao;
+    fornecedor_preferencial_id: string | null;
+  }>();
+  for (let offset = 0; ; offset += 1000) {
+    const r = await db
+      .from("compras_estoque_minimo")
+      .select("insumo_id,qtd_minima,qtd_maxima,origem_reposicao,fornecedor_preferencial_id")
+      .eq("unit_id", uid)
+      .range(offset, offset + 999);
+    if (r.error) throw new Error(r.error.message);
+    for (const row of r.data) {
+      if (row.insumo_id) {
+        minimoMap.set(row.insumo_id, {
+          qtd_minima: row.qtd_minima ?? null,
+          qtd_maxima: row.qtd_maxima ?? null,
+          origem_reposicao: (row.origem_reposicao as OrigemReposicao) ?? "compra",
+          fornecedor_preferencial_id: row.fornecedor_preferencial_id ?? null,
+        });
+      }
+    }
+    if (r.data.length < 1000) break;
+  }
+
+  const presentationIds = new Set<string>();
+  for (let offset = 0; ; offset += 1000) {
+    const r = await db.from("compras_estoque_apresentacoes").select("insumo_id")
+      .eq("unit_id", uid).order("id").range(offset, offset + 999);
+    if (r.error) throw new Error(r.error.message);
+    for (const row of r.data) presentationIds.add(row.insumo_id);
+    if (r.data.length < 1000) break;
+  }
+  for (const id of [...minimoMap.keys(), ...presentationIds]) {
+    if (!compraMap.has(id)) compraMap.set(id, 0);
+  }
+
   const itemIds = [...compraMap.keys()];
   if (itemIds.length === 0) return [];
 
@@ -76,33 +116,6 @@ export async function getEstoqueMinMaxItems(unit_id: string): Promise<EstoqueMin
     if (r.error) throw new Error(r.error.message);
     for (const row of r.data) {
       if (row.item_id) stockMap.set(row.item_id, row.quantidade ?? null);
-    }
-    if (r.data.length < 1000) break;
-  }
-
-  // Step 4: Paginate compras_estoque_minimo — all fields
-  const minimoMap = new Map<string, {
-    qtd_minima: number | null;
-    qtd_maxima: number | null;
-    origem_reposicao: OrigemReposicao;
-    fornecedor_preferencial_id: string | null;
-  }>();
-  for (let offset = 0; ; offset += 1000) {
-    const r = await db
-      .from("compras_estoque_minimo")
-      .select("insumo_id,qtd_minima,qtd_maxima,origem_reposicao,fornecedor_preferencial_id")
-      .eq("unit_id", uid)
-      .range(offset, offset + 999);
-    if (r.error) throw new Error(r.error.message);
-    for (const row of r.data) {
-      if (row.insumo_id) {
-        minimoMap.set(row.insumo_id, {
-          qtd_minima: row.qtd_minima ?? null,
-          qtd_maxima: row.qtd_maxima ?? null,
-          origem_reposicao: (row.origem_reposicao as OrigemReposicao) ?? "compra",
-          fornecedor_preferencial_id: row.fornecedor_preferencial_id ?? null,
-        });
-      }
     }
     if (r.data.length < 1000) break;
   }
@@ -188,19 +201,20 @@ export async function getEstoqueMinMaxItems(unit_id: string): Promise<EstoqueMin
     const contagem = contagemMap.get(insumo_id) ?? null;
     result.push({
       insumo_id,
+      tem_apresentacoes: presentationIds.has(insumo_id),
       nome: catalog.descricao,
       unidade_medida: catalog.unidade_medida,
-      estoque_atual: stockMap.get(insumo_id) ?? null,
-      qtd_minima: minimo?.qtd_minima ?? null,
-      qtd_maxima: minimo?.qtd_maxima ?? null,
-      origem_reposicao: minimo?.origem_reposicao ?? "compra",
+      estoque_atual: presentationIds.has(insumo_id) ? null : (stockMap.get(insumo_id) ?? null),
+      qtd_minima: presentationIds.has(insumo_id) ? null : (minimo?.qtd_minima ?? null),
+      qtd_maxima: presentationIds.has(insumo_id) ? null : (minimo?.qtd_maxima ?? null),
+      origem_reposicao: presentationIds.has(insumo_id) ? "bloqueado" : (minimo?.origem_reposicao ?? "compra"),
       fornecedor_preferencial_id: fornId,
       fornecedor_preferencial_nome: fornId ? (fornecedorNomeMap.get(fornId) ?? null) : null,
       fornecedor_cnpj: fornId ? (fornecedorCnpjMap.get(fornId) ?? null) : null,
       lead_time_dias: raiz ? (leadTimeMap.get(raiz) ?? 3) : 3,
-      tendencia_sem: tendenciaMap.has(insumo_id) ? (tendenciaMap.get(insumo_id) ?? null) : null,
-      qtd_contada: contagem?.qtd ?? null,
-      contado_em: contagem?.contado_em ?? null,
+      tendencia_sem: !presentationIds.has(insumo_id) && tendenciaMap.has(insumo_id) ? (tendenciaMap.get(insumo_id) ?? null) : null,
+      qtd_contada: presentationIds.has(insumo_id) ? null : (contagem?.qtd ?? null),
+      contado_em: presentationIds.has(insumo_id) ? null : (contagem?.contado_em ?? null),
       compra_12m,
     });
   }
@@ -230,6 +244,13 @@ export async function upsertEstoqueMinMax(
 ): Promise<void> {
   const v = upsertSchema.parse(raw);
   const { db, user } = await comprasAccess(v.unit_id, "write");
+
+  const presentation = await db.from("compras_estoque_apresentacoes")
+    .select("id").eq("unit_id", v.unit_id).eq("insumo_id", v.insumo_id).limit(1);
+  if (presentation.error) throw new Error(presentation.error.message);
+  if (presentation.data?.length) {
+    throw new Error("Este item tem apresentações separadas. O cadastro agregado permanece bloqueado.");
+  }
 
   const qtd_minima = v.qtd_minima == null || v.qtd_minima <= 0 ? 0 : v.qtd_minima;
   const qtd_maxima = v.qtd_maxima ?? null;

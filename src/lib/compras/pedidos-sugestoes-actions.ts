@@ -56,7 +56,17 @@ export async function getSugestoesReposicao(unit_id: string): Promise<SugestoesR
 
   if (minimoRows.length === 0) return { comprar: [], transferir_produzir: [] };
 
-  const itemIds = minimoRows.map((m) => m.insumo_id);
+  // Never replenish mixed catalog balances, even if a legacy policy was unblocked.
+  const separated = new Set<string>();
+  for (let offset = 0; ; offset += 1000) {
+    const r = await db.from("compras_estoque_apresentacoes").select("insumo_id")
+      .eq("unit_id", uid).order("id").range(offset, offset + 999);
+    if (r.error) throw new Error(r.error.message);
+    for (const row of r.data) separated.add(row.insumo_id);
+    if (r.data.length < 1000) break;
+  }
+  const eligible = minimoRows.filter(row => !separated.has(row.insumo_id));
+  const itemIds = eligible.map((m) => m.insumo_id);
 
   // Fetch names
   const catalogMap = new Map<string, { descricao: string; unidade_medida: string | null }>();
@@ -125,7 +135,7 @@ export async function getSugestoesReposicao(unit_id: string): Promise<SugestoesR
   const comprar: SugestaoItem[] = [];
   const transferir_produzir: SugestaoItem[] = [];
 
-  for (const m of minimoRows) {
+  for (const m of eligible) {
     const catalog = catalogMap.get(m.insumo_id);
     if (!catalog) continue;
     const stock = stockMap.get(m.insumo_id) ?? null;
