@@ -15,7 +15,6 @@ import { revalidatePath } from "next/cache";
 
 import { createSupabaseServerClient } from "@kph/db/supabase/server";
 import { requireUser } from "@kph/auth/server";
-import { createNotification } from "@/lib/notifications/actions";
 import { comprasAccess } from "@/lib/compras/everest-access";
 import type { ActionResult } from "@/lib/result";
 import {
@@ -352,144 +351,16 @@ export async function createPurchaseOrder(
   }
 }
 
-export async function updatePurchaseOrderStatus(
-  id: string,
-  status: PurchaseOrderStatus,
-): Promise<ActionResult<PurchaseOrder>> {
-  try {
-    const user = await requireUser();
-    const supabase = await createSupabaseServerClient();
-    if (!supabase) return { ok: false, error: "Supabase indisponível" };
-
-    // Estado anterior pra detectar transição real (e não notificar quando
-    // a mudança é redundante).
-    const { data: prev } = await supabase
-      .from(PO_TABLE)
-      .select("status, created_by, numero")
-      .eq("id", id)
-      .maybeSingle();
-    const prevRow = prev as
-      | { status: string; created_by: string | null; numero: number | null }
-      | null;
-
-    const { data, error } = await supabase
-      .from(PO_TABLE)
-      .update({ status } as never)
-      .eq("id", id)
-      .select()
-      .single();
-    if (error || !data) return { ok: false, error: error?.message ?? "Falha" };
-
-    const po = data as PurchaseOrder;
-
-    // Notifica created_by se status realmente mudou e a transição não foi
-    // disparada por ele mesmo (evita spam pra quem fez a ação).
-    if (
-      prevRow &&
-      prevRow.status !== status &&
-      prevRow.created_by &&
-      prevRow.created_by !== user.id
-    ) {
-      const numeroLabel =
-        prevRow.numero != null ? `#${prevRow.numero}` : id.slice(0, 8);
-      await createNotification(
-        prevRow.created_by,
-        "pedido_compra_status",
-        `Pedido ${numeroLabel} agora ${status}`,
-        `Status anterior: ${prevRow.status}`,
-        `/compras/${id}`,
-      );
-    }
-
-    revalidatePath("/compras");
-    revalidatePath(`/compras/${id}`);
-    return { ok: true, data: po };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
-  }
+/** Compatibility for old browser sessions; all transitions require the audited workflow. */
+export async function updatePurchaseOrderStatus(_id: string, _status: PurchaseOrderStatus): Promise<ActionResult<PurchaseOrder>> {
+  void _id; void _status;
+  await requireUser();
+  return {ok:false,error:'Abra Recebimento e conferência para aprovar, cancelar ou registrar a entrega com evidências.'};
 }
-
-export async function sendPurchaseOrder(id: string) {
-  return updatePurchaseOrderStatus(id, "enviado");
-}
-
-export async function cancelPurchaseOrder(id: string) {
-  return updatePurchaseOrderStatus(id, "cancelado");
-}
-
-/**
- * Marca o pedido inteiro como recebido — seta quantidade_recebida = quantidade
- * em todos os items e move status pra 'recebido'.
- */
-export async function receivePurchaseOrderFull(
-  id: string,
-): Promise<ActionResult<PurchaseOrder>> {
-  try {
-    await requireUser();
-    const supabase = await createSupabaseServerClient();
-    if (!supabase) return { ok: false, error: "Supabase indisponível" };
-
-    const { data: items, error: rErr } = await supabase
-      .from(POI_TABLE)
-      .select("id, quantidade")
-      .eq("order_id", id);
-    if (rErr) return { ok: false, error: rErr.message };
-
-    for (const it of items ?? []) {
-      const row = it as { id: string; quantidade: number };
-      const { error } = await supabase
-        .from(POI_TABLE)
-        .update({ quantidade_recebida: row.quantidade } as never)
-        .eq("id", row.id);
-      if (error) return { ok: false, error: error.message };
-    }
-    return updatePurchaseOrderStatus(id, "recebido");
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
-  }
-}
-
-/**
- * Recebe quantidades parciais. `received` é o map item_id → quantidade_recebida
- * (valores absolutos, não delta). Status final: 'parcial' ou 'recebido' se
- * todas as quantidades atingirem o pedido.
- */
-export async function receivePurchaseOrderPartial(
-  id: string,
-  received: Record<string, number>,
-): Promise<ActionResult<PurchaseOrder>> {
-  try {
-    await requireUser();
-    const supabase = await createSupabaseServerClient();
-    if (!supabase) return { ok: false, error: "Supabase indisponível" };
-
-    const { data: items, error: rErr } = await supabase
-      .from(POI_TABLE)
-      .select("id, quantidade")
-      .eq("order_id", id);
-    if (rErr) return { ok: false, error: rErr.message };
-
-    let allFull = true;
-    for (const it of items ?? []) {
-      const row = it as { id: string; quantidade: number };
-      const recv = received[row.id];
-      if (recv == null) {
-        allFull = false;
-        continue;
-      }
-      const safe = Math.max(0, Math.min(recv, row.quantidade));
-      if (safe < row.quantidade) allFull = false;
-      const { error } = await supabase
-        .from(POI_TABLE)
-        .update({ quantidade_recebida: safe } as never)
-        .eq("id", row.id);
-      if (error) return { ok: false, error: error.message };
-    }
-    return updatePurchaseOrderStatus(id, allFull ? "recebido" : "parcial");
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Erro" };
-  }
-}
+export async function sendPurchaseOrder(id:string){return updatePurchaseOrderStatus(id,'enviado');}
+export async function cancelPurchaseOrder(id:string){return updatePurchaseOrderStatus(id,'cancelado');}
+export async function receivePurchaseOrderFull(id:string){return updatePurchaseOrderStatus(id,'recebido');}
+export async function receivePurchaseOrderPartial(id:string,_received:Record<string,number>){void _received;return updatePurchaseOrderStatus(id,'parcial');}
 
 export async function deletePurchaseOrder(
   id: string,

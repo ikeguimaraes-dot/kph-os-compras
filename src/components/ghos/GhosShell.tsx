@@ -64,6 +64,7 @@ const groups = [
   {
     label: "Operação",
     items: [
+      { href: "/compras/operacao", label: "Controle da operação", icon: LayoutDashboard },
       {
         href: "/compras/pulso-86",
         label: "Pulso 86",
@@ -111,7 +112,8 @@ const groups = [
       },
       { href: "/compras/ingredientes", label: "Ingredientes", icon: Leaf },
       { href: "/compras/estoque", label: "Estoque", icon: Boxes },
-      { href: "/compras/logistica", label: "Logística", icon: Truck },
+      { href: "/compras/automacao", label: "Planejamento e simulação", icon: Truck },
+      { href: "/compras/logistica", label: "Logística e produção", icon: Truck },
       {
         href: "/compras/analise",
         label: "Análise de CMV",
