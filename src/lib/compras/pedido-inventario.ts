@@ -6,49 +6,44 @@ export interface PosicaoEstoque {
   deposito: number;
   nome: string;
   motivo: string | null;
+  inventario_id: string | null;
+  numero: number | null;
 }
 export interface InventarioPedido {
   operacao: PosicaoEstoque | null;
   centrais: PosicaoEstoque[];
 }
-export interface DepositoSaldo {
+export interface DepositoInventario {
   unit_id: string; empresa: number; deposito: number; nome: string;
-  total: number | null; concluido_em: string | null; registros: unknown;
+  inventario: { id: string; nr_inventario: number; dt_inventario: string; situacao: string } | null;
+  itens: { item_id: string | null; quantidade_convertida: number | null; unidade_medida: string | null }[];
 }
-type Registro = Record<string, unknown>;
-const number = (v: unknown): number | null => v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v);
 // Empresa/depósito operacional conferidos no cadastro oficial Everest em 04/11/2026.
 export const DEPOSITO_OPERACAO: Readonly<Record<number, number>> = { 1: 2, 3: 3, 5: 6, 10: 5 };
 
-export function posicaoDoItem(depot: DepositoSaldo, item: { cd_item: string; everest_codigo: number; unidade_medida: string | null }, now: number): PosicaoEstoque {
-  const rows = Array.isArray(depot.registros) ? depot.registros as Registro[] : [];
-  const scoped = rows.every(r => r && typeof r === 'object' && number(r.cd_empresa) === depot.empresa && number(r.cd_deposito) === depot.deposito);
-  const matches = rows.filter(r => r && String(r.cd_item) === item.cd_item && number(r.id_item) === item.everest_codigo);
+export function posicaoDoItem(depot: DepositoInventario, item: { id: string; unidade_medida: string | null }): PosicaoEstoque {
+  const inventory = depot.inventario;
+  const matches = depot.itens.filter(row => row.item_id === item.id);
   const row = matches.length === 1 ? matches[0] : undefined;
-  const quantity = number(row?.qt_estoque);
-  const unit = row?.sg_unidademedida == null ? null : String(row.sg_unidademedida);
-  const age = now - Date.parse(depot.concluido_em ?? '');
-  const motivo = !Array.isArray(depot.registros) || depot.total !== rows.length || !scoped ? 'Coleta incompleta ou escopo divergente'
-    : matches.length > 1 ? 'Saldo duplicado'
-    : !row ? 'Item sem leitura'
-    : quantity == null ? 'Quantidade indisponível'
+  const quantity = row?.quantidade_convertida ?? null;
+  const unit = row?.unidade_medida ?? null;
+  const motivo = !inventory || inventory.situacao !== 'ENCERRADO' ? 'Sem inventário encerrado'
+    : matches.length > 1 ? 'Item duplicado no inventário'
+    : !row ? 'Item ausente no último inventário encerrado'
+    : quantity == null || !Number.isFinite(quantity) ? 'Quantidade indisponível'
     : !unit || unit.trim().toUpperCase() !== item.unidade_medida?.trim().toUpperCase() ? 'Unidade divergente'
-    : quantity < 0 ? 'Saldo negativo'
-    : !Number.isFinite(age) || age < 0 || age > 8 * 3600000 ? 'Leitura desatualizada'
+    : quantity < 0 ? 'Quantidade negativa'
     : null;
-  return { quantidade: quantity, unidade_medida: unit, atualizado_em: depot.concluido_em, empresa: depot.empresa, deposito: depot.deposito, nome: depot.nome, motivo };
+  return {
+    quantidade: inventory?.situacao === 'ENCERRADO' ? quantity : null,
+    unidade_medida: unit, atualizado_em: inventory?.dt_inventario ?? null,
+    empresa: depot.empresa, deposito: depot.deposito, nome: depot.nome, motivo,
+    inventario_id: inventory?.id ?? null, numero: inventory?.nr_inventario ?? null,
+  };
 }
 
-export function estoqueParaPedido(
-  item: { estoque_contado: number | null; contado_em: string | null; inventario?: InventarioPedido | null; unidade_medida: string | null },
-  manual?: number,
-): number | null {
-  if (manual != null) return Number.isFinite(manual) && manual >= 0 ? manual : null;
+export function estoqueParaPedido(item: { inventario?: InventarioPedido | null }): number | null {
   const position = item.inventario?.operacao;
-  // A contagem persistida só substitui a leitura ERP se for posterior a ela.
-  if (item.estoque_contado != null && item.contado_em &&
-      (!position?.atualizado_em || Date.parse(item.contado_em) >= Date.parse(position.atualizado_em))) {
-    return Number.isFinite(item.estoque_contado) && item.estoque_contado >= 0 ? item.estoque_contado : null;
-  }
+  // Apenas o último inventário encerrado: saldo ERP e contagem avulsa não substituem esta fonte.
   return position && !position.motivo ? position.quantidade : null;
 }

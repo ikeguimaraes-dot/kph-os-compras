@@ -1,6 +1,6 @@
 "use server";
 import { z } from "zod";
-import { DEPOSITO_OPERACAO, posicaoDoItem, type DepositoSaldo, type InventarioPedido } from "./pedido-inventario";
+import { DEPOSITO_OPERACAO, posicaoDoItem, type DepositoInventario, type InventarioPedido } from "./pedido-inventario";
 import { comprasAccess } from "./everest-access";
 import { includeFixedItems, weeklyPurchaseQuantity } from "./compra-fixa-semanal";
 
@@ -223,24 +223,41 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
     .in("unit_id", units.map(unit => unit.id)).eq("ativo", true).eq("planejamento", true)
     .order("unit_id").order("empresa").order("deposito");
   if (depotResult.error) throw new Error(depotResult.error.message);
-  const depots: DepositoSaldo[] = [];
+  const depots: DepositoInventario[] = [];
   for (const depot of depotResult.data) {
     const central = depot.deposito === 1 && depot.nome.trim().toUpperCase() === "DEPOSITO CENTRAL";
     const operation = depot.unit_id === uid && DEPOSITO_OPERACAO[depot.empresa] === depot.deposito;
     if (!central && !operation) continue;
-    const result = await db.from("everest_estoque_saldos")
-      .select("total,concluido_em,registros")
-      .eq("unit_id", depot.unit_id).eq("empresa", depot.empresa).eq("deposito", depot.deposito).maybeSingle();
+    // Select the inventory header first. Never fall back to an older inventory for missing items.
+    const result = await db.from("everest_inventarios")
+      .select("id,nr_inventario,dt_inventario,situacao")
+      .eq("unit_id", depot.unit_id).eq("everest_cd_empresa", depot.empresa)
+      .eq("everest_cd_deposito", depot.deposito).eq("situacao", "ENCERRADO")
+      .order("dt_inventario", { ascending: false, nullsFirst: false })
+      .order("nr_inventario", { ascending: false, nullsFirst: false })
+      .order("atualizado_em", { ascending: false, nullsFirst: false })
+      .order("id").limit(1).maybeSingle();
     if (result.error) throw new Error(result.error.message);
-    depots.push({ ...depot, total: result.data?.total ?? null, concluido_em: result.data?.concluido_em ?? null, registros: result.data?.registros ?? null });
+    const inventory = result.data as DepositoInventario["inventario"];
+    const items: DepositoInventario["itens"] = [];
+    if (inventory) {
+      for (let offset = 0; ; offset += 500) {
+        const detail = await db.from("everest_inventario_itens")
+          .select("item_id,quantidade_convertida,unidade_medida")
+          .eq("inventario_id", inventory.id).order("id").range(offset, offset + 499);
+        if (detail.error) throw new Error(detail.error.message);
+        items.push(...detail.data);
+        if (detail.data.length < 500) break;
+      }
+    }
+    depots.push({ ...depot, inventario: inventory, itens: items });
   }
-  const observedAt = Date.now();
   const inventarioMap = new Map<string, InventarioPedido>();
   for (const [id, catalog] of catalogMap) {
     const operations = depots.filter(d => d.unit_id === uid && DEPOSITO_OPERACAO[d.empresa] === d.deposito);
     inventarioMap.set(id, {
-      operacao: operations.length === 1 ? posicaoDoItem(operations[0]!, catalog, observedAt) : null,
-      centrais: depots.filter(d => d.deposito === 1).map(d => posicaoDoItem(d, catalog, observedAt)),
+      operacao: operations.length === 1 ? posicaoDoItem(operations[0]!, { id, unidade_medida: catalog.unidade_medida }) : null,
+      centrais: depots.filter(d => d.deposito === 1).map(d => posicaoDoItem(d, { id, unidade_medida: catalog.unidade_medida })),
     });
   }
 

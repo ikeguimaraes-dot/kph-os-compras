@@ -66,7 +66,7 @@ function GrupoTable({
                 ["Tendência/sem", "right", 110],
                 ["Variação", "right", 90],
                 ["Inventário Everest", "right", 140],
-                ["Estoque contado", "right", 130],
+                ["Contagem avulsa", "right", 130],
                 ["Cobertura", "right", 90] as [string, "right", number],
                 ["Zona", "left", 120] as [string, "left", number],
                 ["Aperto", "right", 90] as [string, "right", number],
@@ -93,7 +93,7 @@ function GrupoTable({
         </thead>
         <tbody>
           {itens.map((item) => {
-            const contado = estoqueParaPedido(item, contagens.get(item.insumo_id));
+            const contado = estoqueParaPedido(item);
             const ajustada = item.compra_fixa_semanal != null || contado != null
               ? weeklyPurchaseQuantity(item.sugestao_sem, contado, item.compra_fixa_semanal)
               : null;
@@ -139,7 +139,7 @@ function GrupoTable({
                 {/* Cobertura */}
                 <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
                   {(() => {
-                    const contado = estoqueParaPedido(item, contagens.get(item.insumo_id));
+                    const contado = estoqueParaPedido(item);
                     if (contado == null || item.tendencia_sem <= 0) return <span style={{ color: "#d1d5db" }}>—</span>;
                     const consumoDia = item.tendencia_sem / 7;
                     return `${(contado / consumoDia).toFixed(1)}d`;
@@ -148,7 +148,7 @@ function GrupoTable({
                 {/* Zona */}
                 <td style={{ padding: "10px 12px" }}>
                   {(() => {
-                    const contado = estoqueParaPedido(item, contagens.get(item.insumo_id));
+                    const contado = estoqueParaPedido(item);
                     if (contado == null || item.tendencia_sem <= 0) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
                     const consumoDia = item.tendencia_sem / 7;
                     const cobertura = contado / consumoDia;
@@ -168,7 +168,7 @@ function GrupoTable({
                 {/* Aperto */}
                 <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>
                   {(() => {
-                    const contado = estoqueParaPedido(item, contagens.get(item.insumo_id));
+                    const contado = estoqueParaPedido(item);
                     if (contado == null || item.tendencia_sem <= 0) return "—";
                     const consumoDia = item.tendencia_sem / 7;
                     const cobertura = contado / consumoDia;
@@ -203,10 +203,11 @@ function GrupoTable({
 function PosicaoCell({ posicao, label }: { posicao: PosicaoEstoque | null; label: string }) {
   return <div style={{ marginBottom: 4, color: posicao?.motivo ? "#b45309" : undefined }}>
     <span style={{ display: "block", fontSize: 10 }}>{label}</span>
-    <span>{posicao?.quantidade != null ? `${fmt(posicao.quantidade, 4)} ${posicao.unidade_medida ?? ""}` : "Sem leitura"}</span>
+    <span>{posicao?.quantidade != null ? `${fmt(posicao.quantidade, 4)} ${posicao.unidade_medida ?? ""}` : "Sem inventário"}</span>
     {posicao && <small style={{ display: "block", fontSize: 10 }}>
       Empresa {posicao.empresa} · Depósito {posicao.deposito}<br />
-      {posicao.atualizado_em ? new Date(posicao.atualizado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Sem atualização"}
+      {posicao.numero != null && <>Inventário nº {posicao.numero} · encerrado<br /></>}
+      {posicao.atualizado_em ? posicao.atualizado_em.split("-").reverse().join("/") : "Sem inventário encerrado"}
       {posicao.motivo && <span style={{ display: "block" }}>{posicao.motivo}</span>}
     </small>}
   </div>;
@@ -299,16 +300,16 @@ export function PedidoSugeridoClient({
     <section style={{ marginBottom: 48 }}>
       <SectionHeader title="PEDIDO SUGERIDO DO MÊS" count={totalItens} />
       <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
-        Saldo ERP recente por depósito; atualização programada a cada 6 horas. A compra desconta apenas a operação da loja,
-        exceto compras fixas. Contagem manual posterior à leitura tem prioridade. Central separado por empresa para consulta,
-        sem desconto automático. Saldos negativos, leituras com mais de 8 horas ou incompletas exigem conferência.
+        Base: último inventário encerrado de cada empresa e depósito. A data exibida é a data do inventário.
+        Itens ausentes ficam a confirmar, sem buscar contagens antigas ou saldo ERP. Contagens avulsas são apenas referência.
+        Operação e Central permanecem separados; a compra desconta apenas a operação, exceto compras fixas semanais.
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
         {pedido.grupos.map((grupo) => {
           const sortedItens = [...grupo.itens].sort((a, b) => {
-            const contagemA = estoqueParaPedido(a, contagens.get(a.insumo_id));
-            const contagemB = estoqueParaPedido(b, contagens.get(b.insumo_id));
+            const contagemA = estoqueParaPedido(a);
+            const contagemB = estoqueParaPedido(b);
 
             const getZonaOrder = (item: typeof a, qtd: number | null): number => {
               if (qtd == null || item.tendencia_sem <= 0) return 4;
