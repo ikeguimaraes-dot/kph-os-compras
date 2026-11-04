@@ -1,26 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Ban,
-  CheckCircle2,
-  Loader2,
-  PackageCheck,
-  Send,
-  Trash2,
-} from "lucide-react";
-
-import { Button, buttonVariants } from "@kph/ui/button";
-import { Input } from "@kph/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@kph/ui/dialog";
+import {ArrowLeft, PackageCheck} from 'lucide-react';
+import {buttonVariants} from '@kph/ui/button';
 import {
   Table,
   TableBody,
@@ -31,13 +14,6 @@ import {
 } from "@kph/ui/table";
 import { formatBRL, formatDateBR } from "@/lib/format";
 import {
-  cancelPurchaseOrder,
-  deletePurchaseOrder,
-  receivePurchaseOrderFull,
-  receivePurchaseOrderPartial,
-  sendPurchaseOrder,
-} from "@/app/compras/actions";
-import {
   PO_STATUS_META,
   type PurchaseOrderDetail,
 } from "@/lib/compras/types";
@@ -47,18 +23,8 @@ export function CompraDetalheClient({
 }: {
   order: PurchaseOrderDetail;
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [showPartial, setShowPartial] = useState(false);
-  const [received, setReceived] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      order.items.map((it) => [it.id, String(it.quantidade_recebida)]),
-    ),
-  );
-
   const meta = PO_STATUS_META[order.status];
   const supplierLabel = order.supplier_name ?? order.fornecedor ?? "—";
-  const isFinal = order.status === "recebido" || order.status === "cancelado";
 
   const totals = useMemo(() => {
     const totalQ = order.items.reduce((a, it) => a + Number(it.quantidade), 0);
@@ -72,53 +38,6 @@ export function CompraDetalheClient({
       pctRec: totalQ > 0 ? Math.round((totalRec / totalQ) * 100) : 0,
     };
   }, [order.items]);
-
-  function withTransition(fn: () => Promise<{ ok: boolean; error?: string }>) {
-    startTransition(async () => {
-      const r = await fn();
-      if (!r.ok) window.alert(`Falha: ${r.error}`);
-      router.refresh();
-    });
-  }
-
-  function handleSend() {
-    if (!window.confirm(`Marcar pedido ${order.numero} como enviado?`)) return;
-    withTransition(() => sendPurchaseOrder(order.id));
-  }
-
-  function handleCancel() {
-    if (!window.confirm(`Cancelar pedido ${order.numero}? Essa ação pode ser revertida apenas no banco.`)) return;
-    withTransition(() => cancelPurchaseOrder(order.id));
-  }
-
-  function handleReceiveFull() {
-    if (!window.confirm(`Confirmar recebimento total do pedido ${order.numero}?`)) return;
-    withTransition(() => receivePurchaseOrderFull(order.id));
-  }
-
-  function handleSavePartial() {
-    const map: Record<string, number> = {};
-    for (const it of order.items) {
-      const raw = received[it.id];
-      const n = Number(raw);
-      if (Number.isFinite(n) && n >= 0) map[it.id] = n;
-    }
-    setShowPartial(false);
-    withTransition(() => receivePurchaseOrderPartial(order.id, map));
-  }
-
-  function handleDelete() {
-    if (!window.confirm("Excluir este pedido? Apenas founders podem deletar.")) return;
-    startTransition(async () => {
-      const r = await deletePurchaseOrder(order.id);
-      if (!r.ok) {
-        window.alert(`Falha: ${r.error}`);
-        return;
-      }
-      router.push("/compras");
-      router.refresh();
-    });
-  }
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto" }}>
@@ -217,45 +136,9 @@ export function CompraDetalheClient({
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {order.status === "rascunho" && (
-            <Button onClick={handleSend} disabled={pending}>
-              {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <Send className="mr-2 h-4 w-4" />
-              Enviar
-            </Button>
-          )}
-          {(order.status === "enviado" || order.status === "parcial") && (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => setShowPartial(true)}
-                disabled={pending}
-              >
-                <PackageCheck className="mr-2 h-4 w-4" />
-                Receber parcial
-              </Button>
-              <Button onClick={handleReceiveFull} disabled={pending}>
-                {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                Receber tudo
-              </Button>
-            </>
-          )}
-          {!isFinal && (
-            <Button variant="outline" onClick={handleCancel} disabled={pending}>
-              <Ban className="mr-2 h-4 w-4" />
-              Cancelar
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            onClick={handleDelete}
-            disabled={pending}
-            style={{ color: "var(--destructive)" }}
-            aria-label="Excluir"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <Link className={buttonVariants({variant:'outline'})} href={'/compras/recebimento?pedido='+order.id}>
+            <PackageCheck className="mr-2 h-4 w-4"/> Aprovação e conferência
+          </Link>
         </div>
       </div>
 
@@ -397,69 +280,7 @@ export function CompraDetalheClient({
         </div>
       )}
 
-      {/* Dialog: receber parcial */}
-      <Dialog open={showPartial} onOpenChange={setShowPartial}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Recebimento parcial · {order.numero}</DialogTitle>
-          </DialogHeader>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {order.items.map((it) => (
-              <div
-                key={it.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 100px 80px",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: "var(--text)",
-                    fontWeight: 500,
-                  }}
-                >
-                  {it.nome}
-                </span>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.001"
-                  min="0"
-                  max={String(it.quantidade)}
-                  value={received[it.id] ?? ""}
-                  onChange={(e) =>
-                    setReceived((m) => ({ ...m, [it.id]: e.target.value }))
-                  }
-                />
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: "var(--text-3)",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  / {Number(it.quantidade)} {it.unidade ?? ""}
-                </span>
-              </div>
-            ))}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
-              <button
-                type="button"
-                onClick={() => setShowPartial(false)}
-                className={buttonVariants({ variant: "outline" })}
-              >
-                Cancelar
-              </button>
-              <Button onClick={handleSavePartial} disabled={pending}>
-                Salvar recebimento
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }

@@ -37,3 +37,5 @@ npm-debug.log*
 /docs/prisma-pareto-evidencias/
 /docs/PEDIDOS-VALIDACAO.md
 /docs/pedidos-evidencias/
+
+/supabase/.temp/

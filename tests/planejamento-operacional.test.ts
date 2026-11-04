@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {calculateOrder,type AutomationInput} from '../src/lib/compras/automacao';
+import {readBounded} from '../src/lib/compras/read-bounded';
+const base:AutomationInput={now:'2026-11-03T12:00:00Z',stock:{quantity:0,observedAt:'2026-11-03T11:00:00Z',validated:true},demand:[{date:'2026-11-03',quantity:10,samples:4},{date:'2026-11-04',quantity:10,samples:4},{date:'2026-11-05',quantity:10,samples:4}],incoming:[],incomingComplete:true,pack:6,minimumPacks:1,safety:0,leadDays:0,portion:1,qualityBlocked:false};
+test('late confirmed delivery cannot erase an earlier deficit',()=>{const r=calculateOrder({...base,incoming:[{date:'2026-11-05',quantity:30,confirmed:true}]});assert.equal(r.quantity,24);assert.equal(r.firstShortage,'2026-11-03');});
+test('shortage before supplier lead time blocks normal replenishment',()=>{const r=calculateOrder({...base,leadDays:1});assert.equal(r.quantity,null);assert(r.exceptions.includes('ruptura_antes_da_reposicao'));});
+test('unknown, stale, insufficient samples and quality block never produce an order',()=>{for(const patch of [{stock:null},{stock:{...base.stock!,observedAt:'2026-11-02T11:00:00Z'}},{demand:[{date:'2026-11-03',quantity:10,samples:1}]},{qualityBlocked:true},{incomingComplete:false}])assert.equal(calculateOrder({...base,...patch}).quantity,null);});
+test('zero demand does not create minimum-pack orders',()=>{assert.equal(calculateOrder({...base,demand:base.demand.map(d=>({...d,quantity:0}))}).quantity,0);});
+test('pagination includes records after the API ceiling and reports an explicit cap',async()=>{const source=Array.from({length:1250},(_,i)=>i);const query=async(from:number,to:number)=>({data:source.slice(from,to+1),error:null});const complete=await readBounded(query,2000);assert.equal(complete.data.length,1250);assert.equal(complete.limited,false);const capped=await readBounded(query,1000);assert.equal(capped.data.length,1001);assert.equal(capped.limited,true);await assert.rejects(readBounded(async()=>({data:null,error:'offline'}),1000),/incompleta/);});

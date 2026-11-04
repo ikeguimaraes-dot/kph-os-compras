@@ -1,17 +1,8 @@
-import { requireUser } from "@kph/auth/server"
-
-export const dynamic = "force-dynamic"
-
-export default async function Page() {
-  await requireUser()
-  return (
-    <div style={{ padding: 40, textAlign: "center" }}>
-      <h1 style={{ fontSize: 24, fontWeight: 600, color: "var(--text)" }}>
-        Logística
-      </h1>
-      <p style={{ fontSize: 14, color: "var(--text-3)", marginTop: 8 }}>
-        Em construção. Próxima entrega no roadmap.
-      </p>
-    </div>
-  )
+import {getFluxo} from '@/lib/compras/fluxo-actions';
+import FlowClient from './fluxo-client';
+import '../operacao/operacao.css';
+export const dynamic='force-dynamic';
+export default async function Page({searchParams}:{searchParams:Promise<{modo?:string}>}){
+ const q=await searchParams;
+ return <FlowClient initial={await getFluxo(q.modo==='real'?'real':'teste')}/>;
 }
