@@ -1,5 +1,6 @@
 "use server";
 import { z } from "zod";
+import type { InventarioPedido } from "./pedido-inventario";
 import { comprasAccess } from "./everest-access";
 import { includeFixedItems, weeklyPurchaseQuantity } from "./compra-fixa-semanal";
 
@@ -17,6 +18,7 @@ export interface TendenciaItem {
   sugestao_sem: number;
   compra_fixa_semanal: number | null;
   historico_disponivel: boolean;
+  inventario: InventarioPedido | null;
   estoque_contado: number | null;
   contado_em: string | null;
   fornecedor_id: string | null;
@@ -215,6 +217,16 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
     }
   }
 
+  const inventarioMap = new Map<string, InventarioPedido>();
+  for (let i = 0; i < filteredIds.length; i += 100) {
+    const result = await db.from("v_pedido_estoque")
+      .select("item_id,quantidade,posicao_de,posicao_ate,unidade_medida")
+      .eq("unit_id", uid)
+      .in("item_id", filteredIds.slice(i, i + 100));
+    if (result.error) throw new Error(result.error.message);
+    for (const row of result.data) inventarioMap.set(row.item_id, row);
+  }
+
   // 7. Last refresh timestamp from prisma_refresh_log
   const refreshRow = await db
     .from("prisma_refresh_log")
@@ -274,6 +286,7 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
       sugestao_sem,
       compra_fixa_semanal: minimo.compra_fixa_semanal,
       historico_disponivel: historyIds.has(row.insumo_id),
+      inventario: inventarioMap.get(row.insumo_id) ?? null,
       estoque_contado: contagem?.qtd ?? null,
       contado_em: contagem?.contado_em ?? null,
       fornecedor_id,

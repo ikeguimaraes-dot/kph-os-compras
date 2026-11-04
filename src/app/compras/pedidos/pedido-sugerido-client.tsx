@@ -1,4 +1,5 @@
 "use client";
+import { estoqueParaPedido } from "@/lib/compras/pedido-inventario";
 import { useState, useCallback, useRef } from "react";
 import type { PedidoSugerido, TendenciaItem } from "@/lib/compras/pedido-sugerido-actions";
 import { weeklyPurchaseQuantity } from "@/lib/compras/compra-fixa-semanal";
@@ -64,6 +65,7 @@ function GrupoTable({
                 ["Item", "left", 240],
                 ["Tendência/sem", "right", 110],
                 ["Variação", "right", 90],
+                ["Inventário Everest", "right", 140],
                 ["Estoque contado", "right", 130],
                 ["Cobertura", "right", 90] as [string, "right", number],
                 ["Zona", "left", 120] as [string, "left", number],
@@ -91,10 +93,10 @@ function GrupoTable({
         </thead>
         <tbody>
           {itens.map((item) => {
-            const contado = contagens.has(item.insumo_id)
-              ? contagens.get(item.insumo_id)!
-              : (item.estoque_contado ?? null);
-            const ajustada = weeklyPurchaseQuantity(item.sugestao_sem, contado, item.compra_fixa_semanal);
+            const contado = estoqueParaPedido(item, contagens.get(item.insumo_id));
+            const ajustada = item.compra_fixa_semanal != null || contado != null
+              ? weeklyPurchaseQuantity(item.sugestao_sem, contado, item.compra_fixa_semanal)
+              : null;
             return (
               <tr key={item.insumo_id} style={{ cursor: "pointer", borderBottom: "1px solid #f3f4f6" }} onClick={() => onItemClick(item.insumo_id)}>
                 <td style={{ padding: "10px 12px" }}>
@@ -112,6 +114,13 @@ function GrupoTable({
                   <VariacaoCell pct={item.variacao_pct} />
                 </td>
                 <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                  <span>{item.inventario?.quantidade != null ? `${fmt(item.inventario.quantidade)} ${item.inventario.unidade_medida ?? ""}` : "Sem inventário"}</span>
+                  {item.inventario?.posicao_de && <small style={{ display: "block", color: "#6b7280" }}>
+                    {item.inventario.posicao_de.split("-").reverse().join("/")}
+                    {item.inventario.posicao_ate !== item.inventario.posicao_de && ` a ${item.inventario.posicao_ate?.split("-").reverse().join("/")}`}
+                  </small>}
+                </td>
+                <td style={{ padding: "10px 12px", textAlign: "right" }}>
                   <EstoqueInput
                     value={contagens.has(item.insumo_id) ? contagens.get(item.insumo_id)! : (item.estoque_contado ?? undefined)}
                     onChange={(v) => onContagem(item.insumo_id, v, unitId)}
@@ -127,9 +136,7 @@ function GrupoTable({
                 {/* Cobertura */}
                 <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
                   {(() => {
-                    const contado = contagens.has(item.insumo_id)
-                      ? contagens.get(item.insumo_id)!
-                      : (item.estoque_contado ?? null);
+                    const contado = estoqueParaPedido(item, contagens.get(item.insumo_id));
                     if (contado == null || item.tendencia_sem <= 0) return <span style={{ color: "#d1d5db" }}>—</span>;
                     const consumoDia = item.tendencia_sem / 7;
                     return `${(contado / consumoDia).toFixed(1)}d`;
@@ -138,9 +145,7 @@ function GrupoTable({
                 {/* Zona */}
                 <td style={{ padding: "10px 12px" }}>
                   {(() => {
-                    const contado = contagens.has(item.insumo_id)
-                      ? contagens.get(item.insumo_id)!
-                      : (item.estoque_contado ?? null);
+                    const contado = estoqueParaPedido(item, contagens.get(item.insumo_id));
                     if (contado == null || item.tendencia_sem <= 0) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
                     const consumoDia = item.tendencia_sem / 7;
                     const cobertura = contado / consumoDia;
@@ -160,9 +165,7 @@ function GrupoTable({
                 {/* Aperto */}
                 <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>
                   {(() => {
-                    const contado = contagens.has(item.insumo_id)
-                      ? contagens.get(item.insumo_id)!
-                      : (item.estoque_contado ?? null);
+                    const contado = estoqueParaPedido(item, contagens.get(item.insumo_id));
                     if (contado == null || item.tendencia_sem <= 0) return "—";
                     const consumoDia = item.tendencia_sem / 7;
                     const cobertura = contado / consumoDia;
@@ -180,7 +183,7 @@ function GrupoTable({
                     fontSize: 14,
                   }}
                 >
-                  {fmt(ajustada, 2)}
+                  {ajustada == null ? "A confirmar" : fmt(ajustada, 2)}
                   {item.compra_fixa_semanal != null && <span style={{ display: "block", fontSize: 11, fontWeight: 500 }}>
                     Compra fixa semanal · {item.unidade_medida}<br />Sem desconto de estoque
                   </span>}
@@ -218,7 +221,9 @@ function EstoqueInput({
       type="text"
       inputMode="decimal"
       value={local}
-      placeholder="0"
+      aria-label="Contagem manual de estoque"
+      onClick={(event) => event.stopPropagation()}
+      placeholder="—"
       onChange={(e) => handleChange(e.target.value)}
       style={{
         width: 72,
@@ -278,12 +283,16 @@ export function PedidoSugeridoClient({
   return (
     <section style={{ marginBottom: 48 }}>
       <SectionHeader title="PEDIDO SUGERIDO DO MÊS" count={totalItens} />
+      <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
+        A sugestão desconta o inventário encerrado do Everest, exceto para compras fixas semanais. Contagens manuais na mesma data ou mais recentes têm prioridade.
+        As datas indicam a posição por depósito, sem descontar movimentos posteriores. Sem estoque válido na unidade do item, a compra fica a confirmar.
+      </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
         {pedido.grupos.map((grupo) => {
           const sortedItens = [...grupo.itens].sort((a, b) => {
-            const contagemA = contagens.has(a.insumo_id) ? contagens.get(a.insumo_id)! : (a.estoque_contado ?? null);
-            const contagemB = contagens.has(b.insumo_id) ? contagens.get(b.insumo_id)! : (b.estoque_contado ?? null);
+            const contagemA = estoqueParaPedido(a, contagens.get(a.insumo_id));
+            const contagemB = estoqueParaPedido(b, contagens.get(b.insumo_id));
 
             const getZonaOrder = (item: typeof a, qtd: number | null): number => {
               if (qtd == null || item.tendencia_sem <= 0) return 4;
