@@ -203,7 +203,7 @@ function GrupoTable({
 function PosicaoCell({ posicao, label }: { posicao: PosicaoEstoque | null; label: string }) {
   return <div style={{ marginBottom: 4, color: posicao?.motivo ? "#b45309" : undefined }}>
     <span style={{ display: "block", fontSize: 10 }}>{label}</span>
-    <span>{posicao?.quantidade != null ? `${fmt(posicao.quantidade)} ${posicao.unidade_medida ?? ""}` : "Sem leitura"}</span>
+    <span>{posicao?.quantidade != null ? `${fmt(posicao.quantidade, 4)} ${posicao.unidade_medida ?? ""}` : "Sem leitura"}</span>
     {posicao && <small style={{ display: "block", fontSize: 10 }}>
       Empresa {posicao.empresa} · Depósito {posicao.deposito}<br />
       {posicao.atualizado_em ? new Date(posicao.atualizado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Sem atualização"}
