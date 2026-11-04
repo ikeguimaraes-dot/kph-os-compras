@@ -118,7 +118,7 @@ function GrupoTable({
                   <details onClick={(event) => event.stopPropagation()} style={{ marginTop: 6, fontSize: 11 }}>
                     <summary style={{ cursor: "pointer" }}>Central · por empresa</summary>
                     {item.inventario?.centrais.length ? item.inventario.centrais.map(posicao => (
-                      <PosicaoCell key={`${posicao.empresa}:${posicao.deposito}`} posicao={posicao} label={`Central · empresa ${posicao.empresa}`} />
+                      <PosicaoCell key={`${posicao.empresa}:${posicao.deposito}`} posicao={posicao} label={`Central · ${posicao.empresa_nome}`} />
                     )) : <span>Sem leitura autorizada do Central</span>}
                     <small>Posições contábeis separadas; total físico não consolidado.</small>
                   </details>
@@ -205,7 +205,7 @@ function PosicaoCell({ posicao, label }: { posicao: PosicaoEstoque | null; label
     <span style={{ display: "block", fontSize: 10 }}>{label}</span>
     <span>{posicao?.quantidade != null ? `${fmt(posicao.quantidade, 4)} ${posicao.unidade_medida ?? ""}` : "Sem inventário"}</span>
     {posicao && <small style={{ display: "block", fontSize: 10 }}>
-      Empresa {posicao.empresa} · Depósito {posicao.deposito}<br />
+      {posicao.empresa_nome} · {posicao.nome}<br />
       {posicao.numero != null && <>Inventário nº {posicao.numero} · encerrado<br /></>}
       {posicao.atualizado_em ? posicao.atualizado_em.split("-").reverse().join("/") : "Sem inventário encerrado"}
       {posicao.motivo && <span style={{ display: "block" }}>{posicao.motivo}</span>}

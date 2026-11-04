@@ -3,6 +3,7 @@ export interface PosicaoEstoque {
   unidade_medida: string | null;
   atualizado_em: string | null;
   empresa: number;
+  empresa_nome: string;
   deposito: number;
   nome: string;
   motivo: string | null;
@@ -14,7 +15,7 @@ export interface InventarioPedido {
   centrais: PosicaoEstoque[];
 }
 export interface DepositoInventario {
-  unit_id: string; empresa: number; deposito: number; nome: string;
+  unit_id: string; empresa: number; empresa_nome: string; deposito: number; nome: string;
   inventario: { id: string; nr_inventario: number; dt_inventario: string; situacao: string } | null;
   itens: { item_id: string | null; quantidade_convertida: number | null; unidade_medida: string | null }[];
 }
@@ -37,7 +38,7 @@ export function posicaoDoItem(depot: DepositoInventario, item: { id: string; uni
   return {
     quantidade: inventory?.situacao === 'ENCERRADO' ? quantity : null,
     unidade_medida: unit, atualizado_em: inventory?.dt_inventario ?? null,
-    empresa: depot.empresa, deposito: depot.deposito, nome: depot.nome, motivo,
+    empresa: depot.empresa, empresa_nome: depot.empresa_nome, deposito: depot.deposito, nome: depot.nome, motivo,
     inventario_id: inventory?.id ?? null, numero: inventory?.nr_inventario ?? null,
   };
 }

@@ -250,7 +250,7 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
         if (detail.data.length < 500) break;
       }
     }
-    depots.push({ ...depot, inventario: inventory, itens: items });
+    depots.push({ ...depot, empresa_nome: units.find(unit => unit.id === depot.unit_id)?.name ?? "Empresa não identificada", inventario: inventory, itens: items });
   }
   const inventarioMap = new Map<string, InventarioPedido>();
   for (const [id, catalog] of catalogMap) {

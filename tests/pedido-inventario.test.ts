@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { estoqueParaPedido, posicaoDoItem, type DepositoInventario } from '../src/lib/compras/pedido-inventario';
 const catalog = { id: 'item-a', unidade_medida: 'KG' };
 const line = { item_id: 'item-a', quantidade_convertida: 10, unidade_medida: 'KG' };
-const depot: DepositoInventario = { unit_id: 'meet', empresa: 1, deposito: 2, nome: 'MEET', inventario: { id: 'latest', nr_inventario: 42, dt_inventario: '2026-09-30', situacao: 'ENCERRADO' }, itens: [line] };
+const depot: DepositoInventario = { unit_id: 'meet', empresa: 1, empresa_nome: 'Meet & Eat', deposito: 2, nome: 'MEET', inventario: { id: 'latest', nr_inventario: 42, dt_inventario: '2026-09-30', situacao: 'ENCERRADO' }, itens: [line] };
 const item = { inventario: { operacao: posicaoDoItem(depot, catalog), centrais: [] } };
 test('uses closed inventory regardless of age and keeps its number/date', () => {
   assert.equal(estoqueParaPedido(item), 10);
