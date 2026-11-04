@@ -1,6 +1,6 @@
 "use server";
 import { z } from "zod";
-import type { InventarioPedido } from "./pedido-inventario";
+import { DEPOSITO_OPERACAO, posicaoDoItem, type DepositoSaldo, type InventarioPedido } from "./pedido-inventario";
 import { comprasAccess } from "./everest-access";
 import { includeFixedItems, weeklyPurchaseQuantity } from "./compra-fixa-semanal";
 
@@ -48,7 +48,7 @@ function calcSugestao(tendencia_sem: number, qtd_minima: number, qtd_maxima: num
 
 export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSugerido> {
   const uid = z.string().uuid().parse(unit_id);
-  const { db } = await comprasAccess(uid);
+  const { db, units } = await comprasAccess(uid);
 
   // 1. Fetch all tendência rows for this unit
   const tendRows: {
@@ -113,15 +113,15 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
   const filteredIds = filtered.map((r) => r.insumo_id);
 
   // 3. Fetch item names and units
-  const catalogMap = new Map<string, { descricao: string; unidade_medida: string | null }>();
+  const catalogMap = new Map<string, { descricao: string; unidade_medida: string | null; cd_item: string; everest_codigo: number }>();
   for (let i = 0; i < filteredIds.length; i += 100) {
     const r = await db
       .from("everest_itens")
-      .select("id,descricao,unidade_medida")
+      .select("id,descricao,unidade_medida,cd_item,everest_codigo")
       .in("id", filteredIds.slice(i, i + 100));
     if (r.error) throw new Error(r.error.message);
-    for (const row of r.data as { id: string; descricao: string; unidade_medida: string | null }[]) {
-      catalogMap.set(row.id, { descricao: row.descricao, unidade_medida: row.unidade_medida ?? null });
+    for (const row of r.data as { id: string; descricao: string; unidade_medida: string | null; cd_item: string; everest_codigo: number }[]) {
+      catalogMap.set(row.id, { descricao: row.descricao, unidade_medida: row.unidade_medida ?? null, cd_item: row.cd_item, everest_codigo: row.everest_codigo });
     }
   }
 
@@ -217,14 +217,31 @@ export async function getPedidoSugeridoDoMes(unit_id: string): Promise<PedidoSug
     }
   }
 
-  const inventarioMap = new Map<string, InventarioPedido>();
-  for (let i = 0; i < filteredIds.length; i += 100) {
-    const result = await db.from("v_pedido_estoque")
-      .select("item_id,quantidade,posicao_de,posicao_ate,unidade_medida")
-      .eq("unit_id", uid)
-      .in("item_id", filteredIds.slice(i, i + 100));
+  // Respect the user's allowed houses even for the shared central's company positions.
+  const depotResult = await db.from("everest_estoque_depositos")
+    .select("unit_id,empresa,deposito,nome")
+    .in("unit_id", units.map(unit => unit.id)).eq("ativo", true).eq("planejamento", true)
+    .order("unit_id").order("empresa").order("deposito");
+  if (depotResult.error) throw new Error(depotResult.error.message);
+  const depots: DepositoSaldo[] = [];
+  for (const depot of depotResult.data) {
+    const central = depot.deposito === 1 && depot.nome.trim().toUpperCase() === "DEPOSITO CENTRAL";
+    const operation = depot.unit_id === uid && DEPOSITO_OPERACAO[depot.empresa] === depot.deposito;
+    if (!central && !operation) continue;
+    const result = await db.from("everest_estoque_saldos")
+      .select("total,concluido_em,registros")
+      .eq("unit_id", depot.unit_id).eq("empresa", depot.empresa).eq("deposito", depot.deposito).maybeSingle();
     if (result.error) throw new Error(result.error.message);
-    for (const row of result.data) inventarioMap.set(row.item_id, row);
+    depots.push({ ...depot, total: result.data?.total ?? null, concluido_em: result.data?.concluido_em ?? null, registros: result.data?.registros ?? null });
+  }
+  const observedAt = Date.now();
+  const inventarioMap = new Map<string, InventarioPedido>();
+  for (const [id, catalog] of catalogMap) {
+    const operations = depots.filter(d => d.unit_id === uid && DEPOSITO_OPERACAO[d.empresa] === d.deposito);
+    inventarioMap.set(id, {
+      operacao: operations.length === 1 ? posicaoDoItem(operations[0]!, catalog, observedAt) : null,
+      centrais: depots.filter(d => d.deposito === 1).map(d => posicaoDoItem(d, catalog, observedAt)),
+    });
   }
 
   // 7. Last refresh timestamp from prisma_refresh_log

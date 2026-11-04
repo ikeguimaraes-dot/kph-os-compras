@@ -1,5 +1,5 @@
 "use client";
-import { estoqueParaPedido } from "@/lib/compras/pedido-inventario";
+import { type PosicaoEstoque, estoqueParaPedido } from "@/lib/compras/pedido-inventario";
 import { useState, useCallback, useRef } from "react";
 import type { PedidoSugerido, TendenciaItem } from "@/lib/compras/pedido-sugerido-actions";
 import { weeklyPurchaseQuantity } from "@/lib/compras/compra-fixa-semanal";
@@ -114,11 +114,14 @@ function GrupoTable({
                   <VariacaoCell pct={item.variacao_pct} />
                 </td>
                 <td style={{ padding: "10px 12px", textAlign: "right" }}>
-                  <span>{item.inventario?.quantidade != null ? `${fmt(item.inventario.quantidade)} ${item.inventario.unidade_medida ?? ""}` : "Sem inventário"}</span>
-                  {item.inventario?.posicao_de && <small style={{ display: "block", color: "#6b7280" }}>
-                    {item.inventario.posicao_de.split("-").reverse().join("/")}
-                    {item.inventario.posicao_ate !== item.inventario.posicao_de && ` a ${item.inventario.posicao_ate?.split("-").reverse().join("/")}`}
-                  </small>}
+                  <PosicaoCell posicao={item.inventario?.operacao ?? null} label="Operação" />
+                  <details onClick={(event) => event.stopPropagation()} style={{ marginTop: 6, fontSize: 11 }}>
+                    <summary style={{ cursor: "pointer" }}>Central · por empresa</summary>
+                    {item.inventario?.centrais.length ? item.inventario.centrais.map(posicao => (
+                      <PosicaoCell key={`${posicao.empresa}:${posicao.deposito}`} posicao={posicao} label={`Central · empresa ${posicao.empresa}`} />
+                    )) : <span>Sem leitura autorizada do Central</span>}
+                    <small>Posições contábeis separadas; total físico não consolidado.</small>
+                  </details>
                 </td>
                 <td style={{ padding: "10px 12px", textAlign: "right" }}>
                   <EstoqueInput
@@ -195,6 +198,18 @@ function GrupoTable({
       </table>
     </div>
   );
+}
+
+function PosicaoCell({ posicao, label }: { posicao: PosicaoEstoque | null; label: string }) {
+  return <div style={{ marginBottom: 4, color: posicao?.motivo ? "#b45309" : undefined }}>
+    <span style={{ display: "block", fontSize: 10 }}>{label}</span>
+    <span>{posicao?.quantidade != null ? `${fmt(posicao.quantidade)} ${posicao.unidade_medida ?? ""}` : "Sem leitura"}</span>
+    {posicao && <small style={{ display: "block", fontSize: 10 }}>
+      Empresa {posicao.empresa} · Depósito {posicao.deposito}<br />
+      {posicao.atualizado_em ? new Date(posicao.atualizado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Sem atualização"}
+      {posicao.motivo && <span style={{ display: "block" }}>{posicao.motivo}</span>}
+    </small>}
+  </div>;
 }
 
 function EstoqueInput({
@@ -284,8 +299,9 @@ export function PedidoSugeridoClient({
     <section style={{ marginBottom: 48 }}>
       <SectionHeader title="PEDIDO SUGERIDO DO MÊS" count={totalItens} />
       <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
-        A sugestão desconta o inventário encerrado do Everest, exceto para compras fixas semanais. Contagens manuais na mesma data ou mais recentes têm prioridade.
-        As datas indicam a posição por depósito, sem descontar movimentos posteriores. Sem estoque válido na unidade do item, a compra fica a confirmar.
+        Saldo ERP recente por depósito; atualização programada a cada 6 horas. A compra desconta apenas a operação da loja,
+        exceto compras fixas. Contagem manual posterior à leitura tem prioridade. Central separado por empresa para consulta,
+        sem desconto automático. Saldos negativos, leituras com mais de 8 horas ou incompletas exigem conferência.
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
