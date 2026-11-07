@@ -18,6 +18,11 @@ type Row = Pulso86Data["itens"][number];
 
 const HOUSE_ORDER = ["Meet & Eat", "Madonna", "Match", "Frêneze"];
 const CAUSA_LABEL: Record<string, string> = {
+  compra: "Compra",
+  fora_do_padrao: "Fora do padrão",
+  ruptura_fornecedor: "Ruptura de fornecedor",
+  nao_informado: "Não informado",
+  outro: "Outro",
   compra_gestao: "Compra",
   compras: "Compra",
   producao: "Produção",

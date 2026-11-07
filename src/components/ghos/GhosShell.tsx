@@ -6,6 +6,8 @@ import { ThemeProvider, useTheme } from "next-themes";
 import { useRef } from "react";
 import {
   Activity,
+  TriangleAlert,
+  Orbit,
   ArrowUpRight,
   BookOpen,
   Boxes,
@@ -33,12 +35,14 @@ import {
 } from "lucide-react";
 import { useAuth, useUnit } from "@kph/auth/context";
 import "./ghos.css";
+import { IntegrationBell } from './IntegrationBell';
 
 const groups = [
   {
     label: "Visão & direção",
     items: [
       { href: "/compras/inicio", label: "Início", icon: LayoutDashboard },
+      { href: "/compras/atlas", label: "Atlas", icon: Orbit },
       {
         href: "/compras/prisma",
         label: "Prisma de margem",
@@ -64,6 +68,7 @@ const groups = [
   {
     label: "Operação",
     items: [
+      { href: "/compras/pendencias", label: "Pendências operacionais", icon: TriangleAlert },
       {
         href: "/compras/pulso-86",
         label: "Pulso 86",
@@ -155,7 +160,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         pathname === item.href ||
         (item.href !== "/compras" && pathname.startsWith(item.href + "/")),
     );
-  const label = current?.label ?? "Pedidos de compra";
+  const label = pathname === '/compras/avisos' ? 'Avisos de integração' : current?.label ?? "Pedidos de compra";
   const navigation = (mobile = false) => (
     <>
       <div className="ghos-brand-row">
@@ -287,6 +292,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <span className="ghos-light-icon">Apagar a luz</span>
             <span className="ghos-dark-icon">Acender a luz</span>
           </button>
+          <IntegrationBell />
           <a className="ghos-ecosystem" href="/dashboard">
             KPH OS <ArrowUpRight size={13} />
           </a>

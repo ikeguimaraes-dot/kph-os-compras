@@ -362,7 +362,7 @@ function Workspace({ unit, units }: { unit: string | null; units: House[] }) {
           }}
         >
           <span>
-            <Utensils size={16} aria-hidden="true" /> Pratos em 86
+            <Utensils size={16} aria-hidden="true" /> Histórico e proteção de pratos
           </span>
           <strong>{open.dishes.size}</strong>
           <small>

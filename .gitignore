@@ -9,6 +9,7 @@ node_modules/
 .env
 .env.local
 .env*.local
+.local/
 *.tsbuildinfo
 tsconfig.tsbuildinfo
 .DS_Store
